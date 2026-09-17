@@ -1,0 +1,7 @@
+# CON-7 / CON-10: the frozen set needs a human merge.
+/hypotheses/                     @heyong4725
+/scenarios/measured/             @heyong4725
+/crates/acn-hyp/                 @heyong4725
+/crates/acn-attrib/src/core/     @heyong4725
+/crates/acn-trace/src/schema/    @heyong4725
+/specs/                          @heyong4725

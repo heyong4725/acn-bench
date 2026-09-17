@@ -1,0 +1,8 @@
+# CON-5: time and randomness are injected; direct calls are banned outside acn_emu::{clock,rng}.
+disallowed-methods = [
+  { path = "std::time::Instant::now", reason = "CON-5: use the injected Clock" },
+  { path = "std::time::SystemTime::now", reason = "CON-5: use the injected Clock" },
+  { path = "tokio::time::Instant::now", reason = "CON-5: use the injected Clock" },
+  { path = "rand::thread_rng", reason = "CON-5: use the injected ChaCha20Rng" },
+  { path = "std::thread::sleep", reason = "CON-3/CON-5: no blocking sleeps on the run path" },
+]
