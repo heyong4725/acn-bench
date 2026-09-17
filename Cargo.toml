@@ -36,6 +36,8 @@ opentelemetry_sdk = "0.30"
 tracing-opentelemetry = "0.31"
 zstd = "0.13"
 proptest = "1"
+walkdir = "2"
+tempfile = "3"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
