@@ -120,9 +120,6 @@ pub fn parse_spec_text(file: &str, spec: &str, text: &str) -> Vec<Requirement> {
         let Some((prefix, number)) = split_id(token) else {
             continue;
         };
-        if out.iter().any(|r: &Requirement| r.id == token) {
-            continue;
-        }
         let mut paragraph = (*line).to_owned();
         for l in &lines[i + 1..] {
             if l.trim().is_empty() {
@@ -149,7 +146,10 @@ pub fn parse_spec_text(file: &str, spec: &str, text: &str) -> Vec<Requirement> {
 pub fn spec_files(root: &Path) -> Result<Vec<(String, String)>> {
     let dir = root.join("specs");
     if !dir.is_dir() {
-        return Ok(Vec::new());
+        return Err(Error::Invalid(format!(
+            "no specs/ directory under {} (pass --root <workspace>)",
+            root.display()
+        )));
     }
     let mut files = Vec::new();
     for entry in std::fs::read_dir(&dir).map_err(|e| Error::io(&dir, e))? {
@@ -163,6 +163,12 @@ pub fn spec_files(root: &Path) -> Result<Vec<(String, String)>> {
         }
     }
     files.sort();
+    if files.is_empty() {
+        return Err(Error::Invalid(format!(
+            "no <NNN>-*.md spec files under {}",
+            dir.display()
+        )));
+    }
     Ok(files)
 }
 
@@ -215,5 +221,30 @@ mod tests {
     fn spec_numbers() {
         assert_eq!(spec_number("000-constitution.md"), Some("000"));
         assert_eq!(spec_number("README.md"), None);
+    }
+}
+
+#[cfg(test)]
+mod duplicate_tests {
+    use super::*;
+
+    #[test]
+    fn duplicate_definitions_in_one_file_are_an_error() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir(dir.path().join("specs")).expect("mkdir");
+        std::fs::write(
+            dir.path().join("specs/900-x.md"),
+            "**X-1** It MUST a.\n\n**X-1** It MUST b.\n",
+        )
+        .expect("write");
+        let err = parse_specs(dir.path()).expect_err("duplicate must fail");
+        assert!(err.to_string().contains("defined twice"), "{err}");
+    }
+
+    #[test]
+    fn missing_specs_dir_is_an_error() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let err = parse_specs(dir.path()).expect_err("no specs/");
+        assert!(err.to_string().contains("no specs/ directory"), "{err}");
     }
 }

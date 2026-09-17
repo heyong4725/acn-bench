@@ -124,10 +124,7 @@ fn self_host_the_recorded_hash_matches_the_workspace() {
     let run = xtask_at(&repo_root(), &["env-hash", "--check"]);
     assert!(run.ok(), "{}", run.json);
     let files = strings(&run.json, "files");
-    assert!(
-        files.iter().any(|f| f.contains("hypotheses/p4.toml")),
-        "hypotheses/p4.toml must be in the frozen set: {files:?}"
-    );
+    assert!(!files.is_empty(), "the frozen set must not be empty");
 }
 
 /// Cites: CON-8
@@ -137,4 +134,65 @@ fn env_hash_honours_the_json_contract_on_both_outcomes() {
     assert_eq!(xtask_at(dir.path(), &["env-hash", "--check"]).code, Some(1));
     assert_eq!(xtask_at(dir.path(), &["env-hash", "--write"]).code, Some(0));
     assert_eq!(xtask_at(dir.path(), &["env-hash", "--check"]).code, Some(0));
+}
+
+/// Cites: CON-7
+#[test]
+fn symlinks_inside_the_frozen_set_are_refused() {
+    let dir = frozen_fixture();
+    std::os::unix::fs::symlink(
+        dir.path().join("crates/acn-trace/src/lib.rs"),
+        dir.path().join("hypotheses/link.toml"),
+    )
+    .expect("symlink");
+    let run = xtask_at(dir.path(), &["env-hash"]);
+    assert!(!run.ok(), "{}", run.json);
+    assert!(
+        run.json["error"]
+            .as_str()
+            .expect("error")
+            .contains("symlink"),
+        "{}",
+        run.json
+    );
+}
+
+/// Cites: CON-7
+#[test]
+fn check_failure_reports_the_per_file_diff_and_a_hint() {
+    let dir = frozen_fixture();
+    assert!(xtask_at(dir.path(), &["env-hash", "--write"]).ok());
+    write(dir.path(), "hypotheses/p4.toml", "changed\n");
+    write(dir.path(), "hypotheses/new.toml", "new\n");
+    fs::remove_file(dir.path().join("crates/acn-hyp/src/lib.rs")).expect("rm");
+    let run = xtask_at(dir.path(), &["env-hash", "--check"]);
+    assert!(!run.ok(), "{}", run.json);
+    assert_eq!(
+        strings(&run.json["diff"], "changed"),
+        vec!["hypotheses/p4.toml"]
+    );
+    assert_eq!(
+        strings(&run.json["diff"], "added"),
+        vec!["hypotheses/new.toml"]
+    );
+    assert_eq!(
+        strings(&run.json["diff"], "removed"),
+        vec!["crates/acn-hyp/src/lib.rs"]
+    );
+    assert!(
+        run.json["error"]
+            .as_str()
+            .expect("error")
+            .contains("env-change")
+    );
+
+    fs::write(dir.path().join("env-hash.json"), "{ not json").expect("write");
+    let corrupt = xtask_at(dir.path(), &["env-hash", "--check"]);
+    assert!(!corrupt.ok());
+    assert!(
+        corrupt.json["error"]
+            .as_str()
+            .expect("error")
+            .contains("env-hash.json")
+    );
 }

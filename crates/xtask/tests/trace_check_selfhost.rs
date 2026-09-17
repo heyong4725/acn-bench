@@ -112,3 +112,46 @@ fn argument_errors_still_honour_the_json_contract() {
                 .is_some_and(|e| e.contains("no-such-task"))
     );
 }
+
+/// Cites: CON-12
+#[test]
+fn fails_when_a_citation_is_on_a_non_test_function() {
+    let run = xtask_at(&fixture("not_a_test"), &["trace-check"]);
+    assert!(!run.ok(), "{}", run.json);
+    let problems = run.json["problems"].as_array().expect("problems array");
+    assert_eq!(problems.len(), 1, "{}", run.json);
+    assert!(
+        problems[0]["message"]
+            .as_str()
+            .expect("message")
+            .contains("not a test function"),
+        "{}",
+        run.json
+    );
+    // The citation itself is not counted, so FIX-1 is also reported missing.
+    assert_eq!(run.json["missing"][0]["id"], "FIX-1", "{}", run.json);
+}
+
+/// Cites: CON-12
+#[test]
+fn accepts_continuations_and_attribute_placements() {
+    let run = xtask_at(&fixture("ok"), &["trace-check"]);
+    assert!(run.ok(), "{}", run.json);
+    assert!(strings(&run.json, "problems").is_empty(), "{}", run.json);
+}
+
+/// Cites: CON-12
+#[test]
+fn a_root_without_specs_is_an_error_not_a_pass() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let run = xtask_at(dir.path(), &["trace-check"]);
+    assert!(!run.ok(), "{}", run.json);
+    assert!(
+        run.json["error"]
+            .as_str()
+            .expect("error")
+            .contains("no specs/ directory"),
+        "{}",
+        run.json
+    );
+}

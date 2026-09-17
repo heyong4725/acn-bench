@@ -7,7 +7,7 @@ use tracing_subscriber::EnvFilter;
 
 /// Install the global subscriber. Safe to call once per process.
 pub fn init() {
-    let spec = std::env::var("ACN_LOG").unwrap_or_else(|_| "warn".to_owned());
+    let spec = std::env::var("ACN_LOG").unwrap_or_else(|_| "info".to_owned());
     let builder = tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
         .with_ansi(std::io::stderr().is_terminal())

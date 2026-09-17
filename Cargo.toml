@@ -1,4 +1,4 @@
-# Dependency versions are placeholders to be pinned at T01 (cargo update, then commit Cargo.lock).
+# Workspace manifest. Cargo.lock is committed (T01); bump dependency versions here in the PR that first uses them.
 [workspace]
 resolver = "3"
 members = [
