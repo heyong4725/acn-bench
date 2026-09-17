@@ -1,0 +1,7 @@
+# trace-scope.toml — which spec sections/IDs are implemented (CON-12, ADR-3).
+# `cargo xtask trace-check` requires every MUST listed here to be cited by a
+# `/// Cites:` test. Add IDs (or whole sections) in the PR that implements them.
+
+[[implemented]]
+spec = "000"
+ids = ["CON-2", "CON-5", "CON-6", "CON-7", "CON-8", "CON-9", "CON-12", "CON-19", "CON-20"]
