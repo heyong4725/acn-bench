@@ -119,12 +119,12 @@ fn fails_when_a_citation_is_on_a_non_test_function() {
     let run = xtask_at(&fixture("not_a_test"), &["trace-check"]);
     assert!(!run.ok(), "{}", run.json);
     let problems = run.json["problems"].as_array().expect("problems array");
-    assert_eq!(problems.len(), 1, "{}", run.json);
+    assert_eq!(problems.len(), 2, "{}", run.json);
     assert!(
-        problems[0]["message"]
+        problems.iter().all(|p| p["message"]
             .as_str()
             .expect("message")
-            .contains("not a test function"),
+            .contains("not a test function")),
         "{}",
         run.json
     );

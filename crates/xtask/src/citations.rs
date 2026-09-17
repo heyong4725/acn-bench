@@ -41,8 +41,46 @@ pub struct Scan {
     pub files_scanned: usize,
 }
 
+/// Strip a trailing `// comment`, ignoring `//` inside string literals.
 fn strip_comment(line: &str) -> &str {
-    line.split_once("//").map_or(line, |(code, _)| code).trim()
+    let bytes = line.as_bytes();
+    let mut in_str = false;
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\\' if in_str => i += 1,
+            b'"' => in_str = !in_str,
+            b'/' if !in_str && bytes.get(i + 1) == Some(&b'/') => return line[..i].trim(),
+            _ => {}
+        }
+        i += 1;
+    }
+    line.trim()
+}
+
+/// Byte index of the `]` that closes an attribute opening at the start of
+/// `text` (`#[` or `#![`), string-aware and bracket-depth-aware.
+fn attr_end(text: &str) -> Option<usize> {
+    let bytes = text.as_bytes();
+    let mut depth = 0i32;
+    let mut in_str = false;
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\\' if in_str => i += 1,
+            b'"' => in_str = !in_str,
+            b'[' if !in_str => depth += 1,
+            b']' if !in_str => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(i);
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    None
 }
 
 fn fn_name(line: &str) -> Option<String> {
@@ -74,21 +112,52 @@ fn is_attr_start(line: &str) -> bool {
 fn take_attr(lines: &[&str], mut j: usize) -> (String, String, usize) {
     let mut text = String::new();
     while j < lines.len() {
-        let code = strip_comment(lines[j]);
-        text.push_str(code);
-        text.push(' ');
+        text.push_str(strip_comment(lines[j]));
         j += 1;
-        if let Some(end) = code.rfind(']') {
-            let rest = code[end + 1..].trim().to_owned();
+        if let Some(end) = attr_end(&text) {
+            let rest = text[end + 1..].trim().to_owned();
+            text.truncate(end + 1);
             return (text, rest, j);
         }
+        text.push(' ');
     }
     (text, String::new(), j)
 }
 
+/// The attribute paths an attribute applies: `#[tokio::test(x)]` → `tokio::test`;
+/// `#[cfg_attr(pred, a, b(x))]` → `a`, `b`. `#[cfg(test)]` → `cfg`.
+fn attr_paths(attr: &str) -> Vec<String> {
+    let inner = attr
+        .trim()
+        .trim_start_matches("#![")
+        .trim_start_matches("#[")
+        .trim_end_matches(']')
+        .trim();
+    let path_of = |s: &str| -> String {
+        s.trim()
+            .split(|c: char| c == '(' || c == '=' || c.is_whitespace())
+            .next()
+            .unwrap_or("")
+            .to_owned()
+    };
+    if let Some(args) = inner.strip_prefix("cfg_attr") {
+        let args = args.trim().trim_start_matches('(').trim_end_matches(')');
+        return args
+            .split(',')
+            .skip(1)
+            .map(path_of)
+            .filter(|p| !p.is_empty())
+            .collect();
+    }
+    vec![path_of(inner)]
+}
+
+/// A test attribute is one whose path ends in `test` (`#[test]`,
+/// `#[tokio::test(...)]`, `#[cfg_attr(..., test)]`); `#[cfg(test)]` is not.
 fn is_test_attr(attr: &str) -> bool {
-    attr.split(|c: char| !c.is_alphanumeric() && c != '_')
-        .any(|w| w == "test")
+    attr_paths(attr)
+        .iter()
+        .any(|p| p.rsplit("::").next() == Some("test"))
 }
 
 /// Attributes on the contiguous lines just before `i` (doc lines are skipped).
@@ -149,6 +218,7 @@ pub fn scan_text(file: &str, text: &str, out: &mut Scan) {
         // Collect the ID list, following `,`-terminated continuation lines.
         let mut list = list.trim().to_owned();
         let mut j = i + 1;
+        let mut after_cites = j;
         while list.ends_with(',') && j < lines.len() {
             let Some(more) = lines[j].trim_start().strip_prefix("///") else {
                 break;
@@ -156,6 +226,7 @@ pub fn scan_text(file: &str, text: &str, out: &mut Scan) {
             list.push(' ');
             list.push_str(more.trim());
             j += 1;
+            after_cites = j;
         }
         let ids: Vec<&str> = list
             .split(|c: char| c == ',' || c.is_whitespace())
@@ -223,7 +294,7 @@ pub fn scan_text(file: &str, text: &str, out: &mut Scan) {
                 });
             }
         }
-        i = j.max(i + 1);
+        i = after_cites;
     }
 }
 
@@ -325,5 +396,44 @@ mod counting_tests {
         let ids: Vec<&str> = scan.citations.iter().map(|c| c.id.as_str()).collect();
         assert_eq!(ids, ["B-3"]);
         assert_eq!(scan.problems.len(), 2, "{:?}", scan.problems);
+    }
+}
+
+#[cfg(test)]
+mod round2_tests {
+    use super::*;
+
+    fn run(text: &str) -> Scan {
+        let mut scan = Scan::default();
+        scan_text("t.rs", text, &mut scan);
+        scan
+    }
+
+    #[test]
+    fn cfg_test_and_doc_attributes_are_not_test_attributes() {
+        let s = run(
+            "#[cfg(test)]\n/// Cites: A-1\nfn helper() {}\n\n#[cfg(not(test))]\n/// Cites: A-2\npub fn prod() {}\n\n#[doc = \"a test\"]\n/// Cites: A-3\nfn documented() {}\n\n#[cfg_attr(feature = \"x\", ignore, test)]\n/// Cites: A-4\nfn conditional() {}\n\n#[rstest]\n/// Cites: A-5\nfn other_framework() {}\n",
+        );
+        let ids: Vec<&str> = s.citations.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(ids, ["A-4"]);
+        assert_eq!(s.problems.len(), 4, "{:?}", s.problems);
+    }
+
+    #[test]
+    fn two_cites_lines_in_one_doc_block_both_count() {
+        let s = run("/// Cites: A-1\n/// Cites: A-2,\n///   A-3\n#[test]\nfn t() {}\n");
+        let ids: Vec<&str> = s.citations.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(ids, ["A-1", "A-2", "A-3"]);
+        assert!(s.problems.is_empty(), "{:?}", s.problems);
+    }
+
+    #[test]
+    fn strings_and_brackets_inside_attributes() {
+        let s = run(
+            "/// Cites: A-1\n#[ignore = \"flaky, see https://x/y\"]\n#[test]\nfn a() {}\n\n/// Cites: A-2\n#[test] fn b() { let _ = [0u8; 1]; }\n",
+        );
+        let ids: Vec<&str> = s.citations.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(ids, ["A-1", "A-2"]);
+        assert!(s.problems.is_empty(), "{:?}", s.problems);
     }
 }
