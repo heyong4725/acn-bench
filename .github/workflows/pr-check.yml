@@ -3,7 +3,8 @@ name: pr-check
 # workflow so that adding or removing a label re-runs this job only, not the gate matrix.
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    # edited: retargeting the PR to another base must re-run the check.
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
 
 permissions:
   contents: read
@@ -24,5 +25,6 @@ jobs:
       - name: cargo xtask pr-check
         env:
           BASE_REF: ${{ github.base_ref }}
-          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
-        run: cargo xtask pr-check --base "origin/${BASE_REF}" --labels "${LABELS}"
+          LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        # A full ref name: a tag called origin/<branch> cannot shadow the base (ADR-6).
+        run: cargo xtask pr-check --base "refs/remotes/origin/${BASE_REF}" --labels-json "${LABELS_JSON}"

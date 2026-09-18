@@ -32,7 +32,10 @@ pub struct Report {
     pub must_ids: usize,
     pub implemented: usize,
     pub cited_ids: usize,
+    /// Rust source files the citation scanner parsed.
     pub files_scanned: usize,
+    /// Markdown and hypothesis files the reference scanner read.
+    pub reference_files_scanned: usize,
     pub missing: Vec<Missing>,
     pub unknown_citations: Vec<Citation>,
     pub problems: Vec<Problem>,
@@ -78,7 +81,7 @@ pub fn run(root: &Path) -> Result<Report> {
         tracing::error!(id = %r.id, at = %format!("{}:{}", r.file, r.line), "reference to an ID its spec does not define");
     }
     for d in &refs.dangling_spec_files {
-        tracing::error!(spec = %d.spec, at = %format!("{}:{}", d.file, d.line), "hypothesis names a spec that is neither present nor listed in specs/README.md");
+        tracing::error!(spec = %d.spec, file = %d.file, "{}", d.reason);
     }
     for p in &model.problems {
         tracing::error!(at = %format!("{}:{}", p.file, p.line), "{}", p.message);
@@ -98,7 +101,8 @@ pub fn run(root: &Path) -> Result<Report> {
             .count(),
         implemented: model.implemented.len(),
         cited_ids: by_id.len(),
-        files_scanned: model.files_scanned + refs.files_scanned,
+        files_scanned: model.files_scanned,
+        reference_files_scanned: refs.files_scanned,
         missing,
         unknown_citations,
         problems: model.problems,

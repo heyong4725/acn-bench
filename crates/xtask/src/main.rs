@@ -24,7 +24,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// CON-12: every implemented MUST is cited by a test; every citation names a real ID.
+    /// CON-12: every in-scope requirement is cited by a test; every citation and every ID
+    /// reference in the docs and hypothesis files names a real ID (ADR-3).
     TraceCheck,
     /// Regenerate docs/generated/ (or, with --check, fail if it is out of date).
     DocsInventory {
@@ -40,15 +41,20 @@ enum Cmd {
     },
     /// CON-14, CON-7, LOOP-20: PR label rules and CODEOWNERS coverage of protected paths.
     PrCheck {
-        /// Diff against this git ref (`git diff --name-only <base>...HEAD`).
+        /// Check the commits between the merge base of this ref and HEAD. Pass a full
+        /// ref name or a SHA; a short name found in two namespaces is refused.
         #[arg(long, conflicts_with = "changed")]
         base: Option<String>,
         /// Comma-separated changed paths, instead of reading them from git.
         #[arg(long)]
         changed: Option<String>,
-        /// Comma-separated PR labels.
-        #[arg(long, default_value = "")]
+        /// Comma-separated PR labels (local use).
+        #[arg(long, default_value = "", conflicts_with = "labels_json")]
         labels: String,
+        /// PR labels as a JSON array of strings, so a label containing a comma
+        /// cannot pose as two labels. This is what CI passes.
+        #[arg(long)]
+        labels_json: Option<String>,
     },
 }
 
@@ -89,6 +95,7 @@ fn run() -> Value {
             base,
             changed,
             labels,
+            labels_json,
         } => {
             let split = |s: &str| -> Vec<String> {
                 s.split(',')
@@ -102,7 +109,16 @@ fn run() -> Value {
                 (None, Some(c)) => pr_check::Changes::List(split(&c)),
                 (None, None) => pr_check::Changes::None,
             };
-            to_json(pr_check::run(&root, changes, &split(&labels)))
+            let labels = match labels_json {
+                Some(j) => match serde_json::from_str::<Vec<String>>(&j) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return json!({ "ok": false, "error": format!("--labels-json must be a JSON array of strings: {e}") });
+                    }
+                },
+                None => split(&labels),
+            };
+            to_json(pr_check::run(&root, changes, &labels))
         }
     }
 }

@@ -159,22 +159,28 @@ fn self_host_codeowners_covers_the_protected_paths() {
     assert!(run.ok(), "{}", run.json);
 }
 
-/// Cites: CON-8
-#[test]
-fn pr_check_base_mode_reads_the_diff_from_git() {
-    // Against HEAD itself the diff is empty: nothing to label, exit 0, one JSON object.
-    let run = xtask_at(
-        &repo_root(),
-        &["pr-check", "--base", "HEAD", "--labels", ""],
-    );
-    assert!(run.ok(), "{}", run.json);
-    assert_eq!(run.json["changed"], 0, "{}", run.json);
-}
-
 // ---- git-mode tests on a real temporary repository (review round 1: B1, B2, S3) ----
 
-fn git(root: &Path, args: &[&str]) {
-    let out = std::process::Command::new("git")
+/// Git for the scratch repositories, cut off from the developer's environment
+/// and configuration: an inherited `GIT_DIR` (set by hooks and `rebase --exec`)
+/// would make these commands write into the real repository, and a global hook
+/// or template could make them fail.
+fn git_command(root: &Path) -> std::process::Command {
+    let mut cmd = std::process::Command::new("git");
+    for var in [
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_COMMON_DIR",
+        "GIT_NAMESPACE",
+        "GIT_PREFIX",
+    ] {
+        cmd.env_remove(var);
+    }
+    cmd.env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_NOSYSTEM", "1")
         .arg("-C")
         .arg(root)
         .args([
@@ -184,15 +190,24 @@ fn git(root: &Path, args: &[&str]) {
             "user.email=t@example.com",
             "-c",
             "commit.gpgsign=false",
-        ])
-        .args(args)
-        .output()
-        .expect("git");
+            "-c",
+            "core.hooksPath=/dev/null",
+        ]);
+    cmd
+}
+
+fn git(root: &Path, args: &[&str]) {
+    let out = git_command(root).args(args).output().expect("git");
     assert!(
         out.status.success(),
         "git {args:?}: {}",
         String::from_utf8_lossy(&out.stderr)
     );
+}
+
+fn git_out(root: &Path, args: &[&str]) -> String {
+    let out = git_command(root).args(args).output().expect("git");
+    String::from_utf8_lossy(&out.stdout).trim().to_owned()
 }
 
 /// A repo whose `main` has a spec, a frozen hypothesis, CODEOWNERS and (optionally) a closed M0 gate,
@@ -253,7 +268,7 @@ fn deleting_the_m0_gate_record_does_not_reopen_the_frozen_set() {
     let run = xtask_at(dir.path(), &["pr-check", "--base", "main", "--labels", ""]);
     assert!(
         !run.ok(),
-        "M0 state must come from the base, not the PR head: {}",
+        "M0 state is read from the base as well as the head: {}",
         run.json
     );
     assert_eq!(rules(&run.json), vec!["env-change"]);
@@ -347,11 +362,481 @@ fn codeowners_coverage_follows_last_match_wins_and_needs_a_real_owner() {
 /// Cites: LOOP-20
 #[test]
 fn the_gate_records_and_codeowners_itself_are_protected() {
-    let partial = FULL_CODEOWNERS.replace("/docs/gates/                     @owner\n", "");
-    let dir = root_with(&partial, false);
+    for (line, pattern) in [
+        ("/docs/gates/                     @owner\n", "/docs/gates/"),
+        (
+            "/.github/CODEOWNERS              @owner\n",
+            "/.github/CODEOWNERS",
+        ),
+    ] {
+        let dir = root_with(&FULL_CODEOWNERS.replace(line, ""), false);
+        let run = xtask_at(dir.path(), &["pr-check"]);
+        assert_eq!(strings(&run.json, "codeowners_missing"), vec![pattern]);
+    }
+}
+
+// ---- pre-landing review of PR 2: every case below was a reproduced bypass or an unpinned branch ----
+
+fn commit_all(root: &Path, msg: &str) {
+    git(root, &["add", "-A"]);
+    git(root, &["commit", "-q", "-m", msg]);
+}
+
+/// Cites: CON-8
+#[test]
+fn base_mode_reports_the_commits_and_the_changed_paths() {
+    let dir = git_repo(false);
+    let none = xtask_at(dir.path(), &["pr-check", "--base", "main", "--labels", ""]);
+    assert!(none.ok(), "{}", none.json);
+    assert_eq!(none.json["changed"], 0);
+
+    write(dir.path(), "README.md", "edited\n");
+    commit_all(dir.path(), "edit");
+    let run = xtask_at(dir.path(), &["pr-check", "--base", "main", "--labels", ""]);
+    assert!(run.ok(), "{}", run.json);
+    assert_eq!(strings(&run.json, "changed_paths"), vec!["README.md"]);
+    assert_eq!(
+        run.json["base_sha"],
+        git_out(dir.path(), &["rev-parse", "main"])
+    );
+    assert_eq!(
+        run.json["head_sha"],
+        git_out(dir.path(), &["rev-parse", "HEAD"])
+    );
+    assert_eq!(run.json["merge_base"], run.json["base_sha"]);
+}
+
+/// Cites: CON-7
+#[test]
+fn an_inherited_git_dir_cannot_redirect_the_check_into_another_repository() {
+    let victim = git_repo(false);
+    let before = (
+        git_out(victim.path(), &["rev-parse", "HEAD"]),
+        git_out(victim.path(), &["status", "--porcelain"]),
+    );
+    let dir = git_repo(true);
+    write(
+        dir.path(),
+        "hypotheses/p4.toml",
+        "[poc]\nid = \"p4\"\n# edited\n",
+    );
+    commit_all(dir.path(), "edit");
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
+        .env("GIT_DIR", victim.path().join(".git"))
+        .env("GIT_WORK_TREE", victim.path())
+        .env("GIT_INDEX_FILE", victim.path().join(".git/index"))
+        .args([
+            "--root",
+            dir.path().to_str().expect("utf8"),
+            "pr-check",
+            "--base",
+            "main",
+            "--labels",
+            "",
+        ])
+        .output()
+        .expect("spawn");
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).expect("one JSON object");
+    assert_eq!(
+        json["ok"], false,
+        "the check must still see its own repository: {json}"
+    );
+    assert_eq!(strings(&json, "changed_paths"), vec!["hypotheses/p4.toml"]);
+    let after = (
+        git_out(victim.path(), &["rev-parse", "HEAD"]),
+        git_out(victim.path(), &["status", "--porcelain"]),
+    );
+    assert_eq!(before, after, "the other repository must be untouched");
+}
+
+/// Cites: CON-7, CON-8
+#[test]
+fn an_unusable_base_fails_closed_whatever_the_gate_state() {
+    for m0 in [false, true] {
+        let dir = git_repo(m0);
+        for base in ["nosuchref", "", "-x", "--output=injected"] {
+            let arg = format!("--base={base}");
+            let run = xtask_at(
+                dir.path(),
+                &["pr-check", &arg, "--labels", "env-change,spec-change"],
+            );
+            assert!(!run.ok(), "base `{base}`, m0={m0}: {}", run.json);
+            assert!(run.json["error"].is_string(), "{}", run.json);
+        }
+        assert!(!dir.path().join("injected").exists());
+    }
+    // Not a git checkout at all.
+    let plain = root_with(FULL_CODEOWNERS, false);
+    let run = xtask_at(plain.path(), &["pr-check", "--base", "main"]);
+    assert!(!run.ok(), "{}", run.json);
+    // Unrelated histories: no merge base.
+    let dir = git_repo(false);
+    git(dir.path(), &["switch", "-q", "--orphan", "island"]);
+    write(dir.path(), "x.md", "x\n");
+    commit_all(dir.path(), "island");
+    let run = xtask_at(dir.path(), &["pr-check", "--base", "main"]);
+    assert!(!run.ok(), "{}", run.json);
+    assert!(
+        run.json["error"]
+            .as_str()
+            .expect("error")
+            .contains("merge base")
+    );
+}
+
+/// Cites: CON-7
+#[test]
+fn a_branch_forked_before_m0_still_sees_the_closed_gate() {
+    let dir = git_repo(false);
+    git(dir.path(), &["switch", "-q", "main"]);
+    write(dir.path(), "docs/gates/M0.md", "# M0\n");
+    commit_all(dir.path(), "close M0");
+    git(dir.path(), &["switch", "-q", "work"]); // forked before the gate closed
+    write(dir.path(), "hypotheses/late.toml", "[poc]\nid = \"late\"\n");
+    commit_all(dir.path(), "frozen edit");
+    let run = xtask_at(dir.path(), &["pr-check", "--base", "main", "--labels", ""]);
+    assert_eq!(run.json["m0_closed"], true, "{}", run.json);
+    assert_eq!(rules(&run.json), vec!["env-change"], "{}", run.json);
+}
+
+/// Cites: CON-14
+#[test]
+fn a_tag_that_shadows_the_base_branch_is_refused() {
+    let dir = git_repo(false);
+    write(dir.path(), "specs/000-constitution.md", "edited\n");
+    commit_all(dir.path(), "spec edit");
+    git(
+        dir.path(),
+        &["update-ref", "refs/remotes/origin/main", "main"],
+    );
+    let honest = xtask_at(
+        dir.path(),
+        &["pr-check", "--base", "origin/main", "--labels", ""],
+    );
+    assert_eq!(rules(&honest.json), vec!["spec-change"], "{}", honest.json);
+
+    git(dir.path(), &["tag", "origin/main", "HEAD"]); // git would now resolve the tag first
+    let shadowed = xtask_at(
+        dir.path(),
+        &["pr-check", "--base", "origin/main", "--labels", ""],
+    );
+    assert!(!shadowed.ok(), "{}", shadowed.json);
+    assert!(
+        shadowed.json["error"]
+            .as_str()
+            .expect("error")
+            .contains("ambiguous"),
+        "{}",
+        shadowed.json
+    );
+    let full = xtask_at(
+        dir.path(),
+        &[
+            "pr-check",
+            "--base",
+            "refs/remotes/origin/main",
+            "--labels",
+            "",
+        ],
+    );
+    assert_eq!(
+        rules(&full.json),
+        vec!["spec-change"],
+        "a full ref name is unambiguous: {}",
+        full.json
+    );
+}
+
+/// Cites: CON-7
+#[test]
+fn changing_or_deleting_a_gate_record_is_a_frozen_set_change() {
+    let dir = git_repo(true);
+    git(dir.path(), &["rm", "-q", "docs/gates/M0.md"]);
+    commit_all(dir.path(), "delete the gate record, nothing else");
+    let run = xtask_at(dir.path(), &["pr-check", "--base", "main", "--labels", ""]);
+    assert_eq!(
+        rules(&run.json),
+        vec!["env-change"],
+        "step one of a two-step reopen: {}",
+        run.json
+    );
+
+    // Adding the next gate record is what a gate PR does and needs no label.
+    let dir = git_repo(true);
+    write(dir.path(), "docs/gates/M1.md", "# M1\n");
+    commit_all(dir.path(), "close M1");
+    let run = xtask_at(dir.path(), &["pr-check", "--base", "main", "--labels", ""]);
+    assert!(run.ok(), "{}", run.json);
+
+    // List mode has no history: a listed M0 record counts as closed and as changed.
+    let plain = root_with(FULL_CODEOWNERS, false);
+    let run = xtask_at(
+        plain.path(),
+        &[
+            "pr-check",
+            "--changed",
+            "docs/gates/M0.md,hypotheses/p4.toml",
+            "--labels",
+            "",
+        ],
+    );
+    assert_eq!(rules(&run.json), vec!["env-change"], "{}", run.json);
+}
+
+/// Cites: CON-12
+#[test]
+fn dropping_an_entry_from_the_scope_file_needs_a_label() {
+    let dir = root_with(FULL_CODEOWNERS, false);
+    write(
+        dir.path(),
+        "trace-scope.toml",
+        "[[implemented]]\nspec = \"000\"\nids = [\"CON-7\", \"CON-12\"]\nsections = [\"3\"]\n",
+    );
+    git(dir.path(), &["init", "-q", "-b", "main"]);
+    commit_all(dir.path(), "base");
+    git(dir.path(), &["switch", "-q", "-c", "work"]);
+    write(
+        dir.path(),
+        "trace-scope.toml",
+        "[[implemented]]\nspec = \"000\"\nids = [\"CON-7\", \"CON-8\"]\n",
+    );
+    commit_all(dir.path(), "quietly stop requiring CON-12 and section 3");
+    let run = xtask_at(dir.path(), &["pr-check", "--base", "main", "--labels", ""]);
+    assert!(!run.ok(), "{}", run.json);
+    assert_eq!(run.json["violations"][0]["rule"], "CON-12");
+    assert_eq!(
+        strings(&run.json["violations"][0], "paths"),
+        vec!["000: CON-12", "000: section 3"]
+    );
+    let labelled = xtask_at(
+        dir.path(),
+        &["pr-check", "--base", "main", "--labels", "spec-change"],
+    );
+    assert!(
+        labelled.ok(),
+        "adding CON-8 is free; removals pass once labelled: {}",
+        labelled.json
+    );
+
+    git(dir.path(), &["rm", "-q", "trace-scope.toml"]);
+    commit_all(dir.path(), "delete the scope file");
+    let run = xtask_at(dir.path(), &["pr-check", "--base", "main", "--labels", ""]);
+    assert_eq!(
+        strings(&run.json["violations"][0], "paths").len(),
+        3,
+        "{}",
+        run.json
+    );
+}
+
+/// Cites: CON-7
+#[test]
+fn a_gitlink_in_the_frozen_set_is_seen_even_when_gitmodules_says_ignore() {
+    let dir = git_repo(true);
+    let sha = git_out(dir.path(), &["rev-parse", "HEAD"]);
+    write(
+        dir.path(),
+        ".gitmodules",
+        "[submodule \"v\"]\n\tpath = hypotheses/vendored\n\turl = ./nowhere\n\tignore = all\n",
+    );
+    git(dir.path(), &["add", ".gitmodules"]);
+    git(
+        dir.path(),
+        &[
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            &format!("160000,{sha},hypotheses/vendored"),
+        ],
+    );
+    git(dir.path(), &["commit", "-q", "-m", "vendored"]);
+    let run = xtask_at(dir.path(), &["pr-check", "--base", "main", "--labels", ""]);
+    assert!(
+        strings(&run.json, "changed_paths").contains(&"hypotheses/vendored".to_owned()),
+        "{}",
+        run.json
+    );
+    assert_eq!(rules(&run.json), vec!["env-change"], "{}", run.json);
+}
+
+/// Cites: CON-14, CON-7
+#[test]
+fn paths_that_alias_a_protected_directory_are_classified_with_it() {
+    let dir = root_with(FULL_CODEOWNERS, true);
+    for (path, label) in [
+        ("\u{17f}pecs/000-constitution.md", "spec-change"), // long s: same directory on APFS
+        ("specs", "spec-change"),                           // the directory entry itself
+        ("specs/..\\outside.md", "spec-change"),            // a backslash is a file-name character
+        ("Hypotheses/P4.toml", "env-change"),
+        ("ENV-HASH.JSON", "env-change"),
+        ("crates/acn-hyp", "env-change"),
+    ] {
+        let run = xtask_at(dir.path(), &["pr-check", "--changed", path, "--labels", ""]);
+        assert_eq!(rules(&run.json), vec![label], "`{path}`: {}", run.json);
+    }
+    for bad in ["/specs/a.md", "../outside.md"] {
+        let run = xtask_at(dir.path(), &["pr-check", "--changed", bad, "--labels", ""]);
+        assert!(
+            run.json["error"].is_string(),
+            "`{bad}` must be refused: {}",
+            run.json
+        );
+    }
+    // Look-alikes are not protected, even with the gate closed.
+    let run = xtask_at(
+        dir.path(),
+        &[
+            "pr-check",
+            "--changed",
+            "specs-old/x.md,hypotheses2/y.toml,.,docs/..",
+            "--labels",
+            "",
+        ],
+    );
+    assert!(run.ok(), "{}", run.json);
+    assert_eq!(run.json["changed"], 2);
+    assert!(
+        strings(&run.json, "violations").is_empty() && strings(&run.json, "advisories").is_empty()
+    );
+}
+
+/// Cites: CON-7
+#[test]
+fn a_root_below_the_repository_top_level_is_refused() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let ws = dir.path().join("ws");
+    write(&ws, ".github/CODEOWNERS", FULL_CODEOWNERS);
+    write(&ws, "specs/000-constitution.md", "spec\n");
+    git(dir.path(), &["init", "-q", "-b", "main"]);
+    commit_all(dir.path(), "base");
+    let run = xtask_at(&ws, &["pr-check", "--base", "main", "--labels", ""]);
+    assert!(!run.ok(), "{}", run.json);
+    assert!(
+        run.json["error"]
+            .as_str()
+            .expect("error")
+            .contains("top level"),
+        "{}",
+        run.json
+    );
+}
+
+/// Cites: CON-14
+#[test]
+fn labels_as_json_cannot_be_split_on_commas() {
+    let dir = root_with(FULL_CODEOWNERS, false);
+    let spoof = xtask_at(
+        dir.path(),
+        &[
+            "pr-check",
+            "--changed",
+            "specs/a.md",
+            "--labels-json",
+            "[\"not-a,spec-change\"]",
+        ],
+    );
+    assert_eq!(rules(&spoof.json), vec!["spec-change"], "{}", spoof.json);
+    let real = xtask_at(
+        dir.path(),
+        &[
+            "pr-check",
+            "--changed",
+            "specs/a.md",
+            "--labels-json",
+            "[\"spec-change\"]",
+        ],
+    );
+    assert!(real.ok(), "{}", real.json);
+    let bad = xtask_at(
+        dir.path(),
+        &[
+            "pr-check",
+            "--changed",
+            "specs/a.md",
+            "--labels-json",
+            "spec-change",
+        ],
+    );
+    assert!(bad.json["error"].is_string(), "{}", bad.json);
+}
+
+/// Cites: LOOP-20
+#[test]
+fn codeowners_lines_github_would_not_honour_do_not_count() {
+    let exact = "/specs/                          @owner";
+    for (what, replacement) in [
+        ("a doubled leading slash", "//specs/ @owner"),
+        ("a non-owner token before the owner", "/specs/ TODO @owner"),
+        (
+            "a no-break space instead of a separator",
+            "/specs/\u{a0}@owner",
+        ),
+        ("an invalid handle", "/specs/ @/"),
+        ("an e-mail without a domain", "/specs/ a@b"),
+    ] {
+        let dir = root_with(&FULL_CODEOWNERS.replace(exact, replacement), false);
+        let run = xtask_at(dir.path(), &["pr-check"]);
+        assert_eq!(
+            strings(&run.json, "codeowners_missing"),
+            vec!["/specs/"],
+            "{what}: {}",
+            run.json
+        );
+    }
+    let dir = root_with(
+        &FULL_CODEOWNERS.replace(
+            "/env-hash.json                   @owner",
+            "/env-hash.json/ @owner",
+        ),
+        false,
+    );
     let run = xtask_at(dir.path(), &["pr-check"]);
     assert_eq!(
         strings(&run.json, "codeowners_missing"),
-        vec!["/docs/gates/"]
+        vec!["/env-hash.json"],
+        "a directory-only pattern does not match the file: {}",
+        run.json
+    );
+
+    for (what, extra, missing) in [
+        (
+            "a later literal file inside a protected directory",
+            "/specs/000-constitution.md @bot\n",
+            "/specs/",
+        ),
+        (
+            "a later escaped spelling of the same path",
+            "/spec\\s/\n",
+            "/specs/",
+        ),
+        (
+            "a later character-class glob",
+            "/hypotheses/p[0-9].toml @bot\n",
+            "/hypotheses/",
+        ),
+        (
+            "a later entry without a leading slash",
+            "docs/gates/ @bot\n",
+            "/docs/gates/",
+        ),
+    ] {
+        let dir = root_with(&format!("{FULL_CODEOWNERS}{extra}"), false);
+        let run = xtask_at(dir.path(), &["pr-check"]);
+        assert!(
+            strings(&run.json, "codeowners_missing").contains(&missing.to_owned()),
+            "{what}: {}",
+            run.json
+        );
+    }
+
+    let big = format!("# {}\n{FULL_CODEOWNERS}", "x".repeat(3 * 1024 * 1024 + 1));
+    let dir = root_with(&big, false);
+    let run = xtask_at(dir.path(), &["pr-check"]);
+    assert!(
+        run.json["error"]
+            .as_str()
+            .expect("error")
+            .contains("ignores"),
+        "GitHub ignores an oversized file"
     );
 }
