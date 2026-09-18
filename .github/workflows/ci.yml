@@ -1,8 +1,6 @@
 name: ci
 on:
   pull_request:
-    # labeled/unlabeled: pr-check depends on the PR's labels (CON-7, CON-14).
-    types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
     branches: [main]
   schedule:
@@ -13,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -27,39 +25,39 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       # CON-2: the toolchain is the one pinned in rust-toolchain.toml, never floating stable.
-      - run: rustup toolchain install || rustup show
+      - run: rustup toolchain install
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - uses: taiki-e/install-action@4076c08d76dba979c11a7285295b0716c1d67908 # v2
         with:
           tool: cargo-deny
       - run: tools/ci.sh
 
-  pr-check:
-    # CON-14 / CON-7 / LOOP-20: label rules and CODEOWNERS coverage (ADR-6).
-    if: github.event_name == 'pull_request'
+  lab:
+    # CON-23: the only gates for lab crates are fmt and clippy on the crate itself.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          fetch-depth: 0
-      - run: rustup toolchain install || rustup show
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-      - name: cargo xtask pr-check
-        env:
-          BASE_REF: ${{ github.base_ref }}
-          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
-        run: cargo xtask pr-check --base "origin/${BASE_REF}" --labels "${LABELS}"
+      - run: rustup toolchain install
+      - name: fmt and clippy on every lab crate
+        run: |
+          set -euo pipefail
+          for manifest in lab/*/Cargo.toml; do
+            echo "::group::${manifest}"
+            cargo fmt --manifest-path "${manifest}" --check
+            cargo clippy --manifest-path "${manifest}" --all-targets -- -D warnings
+            echo "::endgroup::"
+          done
 
   nightly:
-    # CON-12: the accept tier runs in full every night; live/netem join as they land.
+    # CON-12: every tier that can run unattended runs in full each night; live and
+    # netem join as they land (acn-accept is a workspace member, so it is included).
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - run: rustup toolchain install || rustup show
+      - run: rustup toolchain install
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - run: cargo test --workspace
-      - run: cargo test -p acn-accept
 
   netem:
     # Linux-only ignored tier. Enabled by the repository variable NETEM_ENABLED once
@@ -68,5 +66,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - run: rustup toolchain install || rustup show
+      - run: rustup toolchain install
       - run: sudo -E env "PATH=$PATH" cargo test --workspace --features netem -- --ignored

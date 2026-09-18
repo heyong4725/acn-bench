@@ -1,6 +1,6 @@
 //! Requirement-ID references outside Rust sources (ADR-3, amendment 2).
 //!
-//! Markdown at the root, under `docs/` and under `specs/`, and hypothesis files
+//! Markdown at the root, under `docs/`, `specs/` and `.github/`, and hypothesis files
 //! under `hypotheses/`, are scanned for `PREFIX-n` tokens. A token whose prefix
 //! belongs to a written spec must name a defined ID; a token whose prefix is
 //! only listed in `specs/README.md` (a spec still to write) is a forward
@@ -66,6 +66,16 @@ pub fn id_tokens(line: &str) -> Vec<String> {
             }
             if j > digits_start {
                 out.push(line[start..j].to_owned());
+                // A range, `TRC-10..21` or `TRC-10–21`, names its second endpoint too.
+                let rest = &line[j..];
+                let after_sep = rest.strip_prefix("..").or_else(|| rest.strip_prefix('–'));
+                if let Some(tail) = after_sep {
+                    let digits: String = tail.chars().take_while(char::is_ascii_digit).collect();
+                    if !digits.is_empty() {
+                        out.push(format!("{}{digits}", &line[start..digits_start]));
+                        j += rest.len() - tail.len() + digits.len();
+                    }
+                }
                 i = j;
             }
         }
@@ -89,8 +99,14 @@ fn index(root: &Path) -> Result<(BTreeSet<String>, BTreeSet<String>)> {
         if cells[2].ends_with(".md") {
             files.insert(format!("specs/{}", cells[2]));
         }
-        for p in cells[3].split(|c: char| !(c.is_ascii_uppercase() || c.is_ascii_digit())) {
-            if p.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
+        // A prefix cell holds whole prefixes separated by commas or spaces; a
+        // placeholder such as `P…` is not a prefix.
+        for p in cells[3].split(|c: char| c == ',' || c.is_whitespace()) {
+            let whole = !p.is_empty()
+                && p.chars().next().is_some_and(|c| c.is_ascii_uppercase())
+                && p.chars()
+                    .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit());
+            if whole {
                 prefixes.insert(p.to_owned());
             }
         }
@@ -111,7 +127,12 @@ fn scanned_files(root: &Path) -> Result<Vec<std::path::PathBuf>> {
                 .filter(|p| p.is_file() && p.extension().is_some_and(|x| x == "md")),
         );
     }
-    for (base, ext) in [("docs", "md"), ("specs", "md"), ("hypotheses", "toml")] {
+    for (base, ext) in [
+        ("docs", "md"),
+        ("specs", "md"),
+        (".github", "md"),
+        ("hypotheses", "toml"),
+    ] {
         let dir = root.join(base);
         if !dir.is_dir() {
             continue;
@@ -122,6 +143,7 @@ fn scanned_files(root: &Path) -> Result<Vec<std::path::PathBuf>> {
             .filter_entry(|e| {
                 let name = e.file_name().to_str().unwrap_or("");
                 !(e.file_type().is_dir()
+                    && e.depth() > 0
                     && (name == "generated" || name == "lab" || name.starts_with('.')))
             });
         for entry in walker {
@@ -171,35 +193,45 @@ pub fn scan(root: &Path, reqs: &[Requirement]) -> Result<RefScan> {
                     out.forward.insert(id);
                 }
             }
-            if is_hypothesis
-                && let Some(spec) = spec_path(line)
-                && !root.join(&spec).is_file()
-            {
-                if indexed_files.contains(&spec) {
+        }
+        if is_hypothesis {
+            match poc_spec(&text) {
+                Ok(None) => {}
+                Ok(Some(spec)) if is_spec_path(&spec) && root.join(&spec).is_file() => {}
+                Ok(Some(spec)) if is_spec_path(&spec) && indexed_files.contains(&spec) => {
                     out.forward.insert(spec);
-                } else {
-                    out.dangling_spec_files.push(DanglingSpecFile {
-                        spec,
-                        file: file.clone(),
-                        line: n + 1,
-                    });
                 }
+                Ok(Some(spec)) => out.dangling_spec_files.push(DanglingSpecFile {
+                    spec,
+                    file: file.clone(),
+                    line: 0,
+                }),
+                Err(e) => out.dangling_spec_files.push(DanglingSpecFile {
+                    spec: format!("<unparseable TOML: {e}>"),
+                    file: file.clone(),
+                    line: 0,
+                }),
             }
         }
     }
     Ok(out)
 }
 
-/// The value of a `spec = "specs/..."` line in a hypothesis file.
-fn spec_path(line: &str) -> Option<String> {
-    let t = line.trim();
-    let rest = t
-        .strip_prefix("spec")?
-        .trim_start()
-        .strip_prefix('=')?
-        .trim();
-    let value = rest.strip_prefix('"')?.split('"').next()?;
-    value.starts_with("specs/").then(|| value.to_owned())
+/// `[poc].spec` of a hypothesis file, read as TOML (any quoting, inline tables).
+fn poc_spec(text: &str) -> std::result::Result<Option<String>, toml::de::Error> {
+    let value: toml::Value = toml::from_str(text.trim_start_matches('\u{feff}'))?;
+    Ok(value
+        .get("poc")
+        .and_then(|poc| poc.get("spec"))
+        .and_then(toml::Value::as_str)
+        .map(str::to_owned))
+}
+
+/// A spec path is `specs/<file>.md`: one component below `specs/`, no traversal.
+fn is_spec_path(spec: &str) -> bool {
+    spec.strip_prefix("specs/").is_some_and(|f| {
+        !f.is_empty() && !f.contains('/') && !f.contains("..") && f.ends_with(".md")
+    })
 }
 
 #[cfg(test)]
@@ -209,8 +241,10 @@ mod tests {
     #[test]
     fn tokens() {
         assert_eq!(
-            id_tokens("see CON-5(e), TRC-10..21 and CON-5c; (LOOP-3)"),
-            ["CON-5", "TRC-10", "CON-5", "LOOP-3"]
+            id_tokens("see CON-5(e), TRC-10..21 and CON-5c; (LOOP-3), HYP-1–9"),
+            [
+                "CON-5", "TRC-10", "TRC-21", "CON-5", "LOOP-3", "HYP-1", "HYP-9"
+            ]
         );
         assert_eq!(
             id_tokens("x86-64 aCON-1 pre-CON-2 UTF-8 P1A-3"),
@@ -220,12 +254,33 @@ mod tests {
     }
 
     #[test]
-    fn spec_paths() {
+    fn poc_spec_is_read_as_toml() {
         assert_eq!(
-            spec_path("spec = \"specs/100-p4.md\"").as_deref(),
-            Some("specs/100-p4.md")
+            poc_spec("[poc]\nspec = 'specs/a.md'\n")
+                .ok()
+                .flatten()
+                .as_deref(),
+            Some("specs/a.md")
         );
-        assert_eq!(spec_path("specification = \"specs/x.md\""), None);
-        assert_eq!(spec_path("spec = \"elsewhere/x.md\""), None);
+        assert_eq!(
+            poc_spec("poc = { spec = \"specs/b.md\" }\n")
+                .ok()
+                .flatten()
+                .as_deref(),
+            Some("specs/b.md")
+        );
+        assert_eq!(
+            poc_spec("[other]\nspec = \"specs/c.md\"\n").ok().flatten(),
+            None
+        );
+        assert!(poc_spec("[poc\n").is_err());
+    }
+
+    #[test]
+    fn spec_paths() {
+        assert!(is_spec_path("specs/100-p4.md"));
+        assert!(!is_spec_path("specs/../hypotheses/p1.toml"));
+        assert!(!is_spec_path("specs/sub/x.md"));
+        assert!(!is_spec_path("elsewhere/x.md"));
     }
 }

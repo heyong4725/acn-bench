@@ -9,10 +9,19 @@ disallowed-methods = [
   { path = "time::OffsetDateTime::now_utc", reason = "CON-5: use the injected Clock" },
   { path = "std::thread::sleep", reason = "CON-3/CON-5: no blocking sleeps on the run path" },
   { path = "rand::thread_rng", reason = "CON-5: use the injected ChaCha20Rng" },
-  { path = "rand::rng", reason = "CON-5: use the injected ChaCha20Rng" },
+  { path = "rand::rng", reason = "CON-5: use the injected ChaCha20Rng", allow-invalid = true }, # a module under rand 0.8, a function from 0.9
   { path = "rand::random", reason = "CON-5: use the injected ChaCha20Rng" },
   { path = "fastrand::Rng::new", reason = "CON-5: use the injected ChaCha20Rng" },
-  { path = "getrandom::fill", reason = "CON-5: use the injected ChaCha20Rng" },
+  { path = "fastrand::u32", reason = "CON-5: use the injected ChaCha20Rng" },
+  { path = "fastrand::u64", reason = "CON-5: use the injected ChaCha20Rng" },
+  { path = "fastrand::usize", reason = "CON-5: use the injected ChaCha20Rng" },
+  { path = "fastrand::f64", reason = "CON-5: use the injected ChaCha20Rng" },
+  { path = "fastrand::bool", reason = "CON-5: use the injected ChaCha20Rng" },
+  { path = "fastrand::shuffle", reason = "CON-5: use the injected ChaCha20Rng" },
+  { path = "getrandom::fill", reason = "CON-5: use the injected ChaCha20Rng", allow-invalid = true },
+  { path = "getrandom::getrandom", reason = "CON-5: use the injected ChaCha20Rng", allow-invalid = true },
+  { path = "std::time::SystemTime::elapsed", reason = "CON-5: reads the wall clock; use the injected Clock" },
+  { path = "ahash::RandomState::new", reason = "CON-5: per-process random hasher seeds break byte-identical output" },
   { path = "uuid::Uuid::new_v4", reason = "CON-5: derive identifiers from the run seed (TRC-27)" },
   { path = "std::collections::hash_map::RandomState::new", reason = "CON-5: per-process random hasher seeds break byte-identical output" },
 ]
@@ -21,6 +30,12 @@ disallowed-methods = [
 disallowed-types = [
   { path = "std::collections::HashMap", reason = "CON-5(c): iteration order is random; use BTreeMap" },
   { path = "std::collections::HashSet", reason = "CON-5(c): iteration order is random; use BTreeSet" },
+  { path = "hashbrown::HashMap", reason = "CON-5(c): iteration order is random; use BTreeMap" },
+  { path = "hashbrown::HashSet", reason = "CON-5(c): iteration order is random; use BTreeSet" },
+  { path = "ahash::AHashMap", reason = "CON-5(c): iteration order is random; use BTreeMap" },
+  { path = "ahash::AHashSet", reason = "CON-5(c): iteration order is random; use BTreeSet" },
+  { path = "rand::rngs::OsRng", reason = "CON-5: use the injected ChaCha20Rng" },
+  { path = "rand::rngs::ThreadRng", reason = "CON-5: use the injected ChaCha20Rng" },
 ]
 # CON-19: the unwrap/expect/panic lints are denied in library targets; tests are exempt.
 allow-unwrap-in-tests = true
