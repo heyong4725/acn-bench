@@ -12,3 +12,6 @@ CON-5(b) names `Instant::now()`, `SystemTime::now()`, `rand::thread_rng()` "and 
 
 ## Consequences
 The ban is coarse on purpose: it is cheaper to justify one exception than to audit every map for whether its order leaks into a bundle. Lints see only first-party code, so a dependency that iterates a `HashMap` into output is caught by the byte-identity acceptance test (TRC-24), not here.
+
+## Known limits
+Clippy's `disallowed_types` fires on a type in type position, not on a unit struct used as a value, so `let mut r = rand::rngs::OsRng;` passes; and a method list can never enumerate a crate (`fastrand` has dozens of free functions). The list is a tripwire for the common mistakes, not a proof. The proof is the byte-identity acceptance test (TRC-24) and review of any new dependency that provides entropy or time: `cargo deny` output shows when `rand`, `fastrand` or `getrandom` first enters the substrate's graph.

@@ -470,9 +470,9 @@ fn ci_has_a_live_nightly_trigger_and_a_job_that_uses_it() {
         "schedule needs a cron entry"
     );
     assert!(
-        ci.iter()
-            .any(|l| l.trim().starts_with("if: github.event_name == 'schedule'")),
-        "a job must run on the schedule"
+        ci.iter().any(|l| l.trim()
+            == "if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"),
+        "the nightly job must run on the schedule"
     );
 }
 
@@ -555,4 +555,51 @@ fn a_spec_conflict_issue_template_exists_with_the_mandated_title() {
         "issue title must start `spec-conflict: <ids>`"
     );
     assert!(t.contains("labels: spec-conflict"));
+}
+
+/// Cites: CON-9
+#[test]
+fn workflows_cannot_be_quietly_disabled() {
+    for wf_path in [".github/workflows/ci.yml", ".github/workflows/pr-check.yml"] {
+        let wf = workflow(wf_path);
+        for l in &wf {
+            let t = l.trim();
+            for banned in [
+                "continue-on-error:",
+                "paths-ignore:",
+                "paths:",
+                "branches-ignore:",
+            ] {
+                assert!(
+                    !t.starts_with(banned),
+                    "{wf_path}: `{banned}` would let a required check go quiet"
+                );
+            }
+            assert!(
+                t != "if: false" && t != "if: ${{ false }}",
+                "{wf_path}: a job or step is switched off"
+            );
+        }
+    }
+    // The only conditional jobs are the scheduled ones and the PR-only check, spelled exactly.
+    let ci = workflow(".github/workflows/ci.yml");
+    let conditions: Vec<&str> = ci
+        .iter()
+        .map(|l| l.trim())
+        .filter(|l| l.starts_with("if:"))
+        .collect();
+    assert_eq!(
+        conditions,
+        [
+            "if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
+            "if: github.event_name == 'schedule' && vars.NETEM_ENABLED == 'true'",
+        ],
+        "gates and lab must be unconditional; nightly and netem are the only conditional jobs"
+    );
+    assert!(
+        !workflow(".github/workflows/pr-check.yml")
+            .iter()
+            .any(|l| l.trim().starts_with("if:")),
+        "pr-check must be unconditional"
+    );
 }
