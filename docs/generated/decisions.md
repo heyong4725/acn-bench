@@ -9,3 +9,4 @@
 | [ADR-3](../decisions/ADR-3.md) | What `trace-check` counts as implemented, and how citations are parsed | accepted (T01) | CON-12, CON-23 |
 | [ADR-4](../decisions/ADR-4.md) | `env-hash` covers exactly the frozen set and is recorded at the root | accepted (T01) | CON-5(e), CON-7, CON-9 |
 | [ADR-5](../decisions/ADR-5.md) | T01 scaffolds every CON-6 crate as a stub; CLI argument errors stay inside the JSON contract | accepted (T01) | CON-6, CON-8, CON-19 |
+| [ADR-6](../decisions/ADR-6.md) | `cargo xtask pr-check`: label rules and CODEOWNERS coverage as machine checks | accepted (xtask hardening) | CON-7, CON-14, LOOP-20 |

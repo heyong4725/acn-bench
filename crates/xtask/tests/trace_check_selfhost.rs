@@ -156,6 +156,163 @@ fn a_root_without_specs_is_an_error_not_a_pass() {
     );
 }
 
+fn ids_of(v: &serde_json::Value, key: &str) -> Vec<String> {
+    let mut ids: Vec<String> = v[key]
+        .as_array()
+        .unwrap_or_else(|| panic!("{key} array"))
+        .iter()
+        .map(|x| x["id"].as_str().expect("id").to_owned())
+        .collect();
+    ids.sort();
+    ids
+}
+
+/// Cites: CON-12
+#[test]
+fn an_in_scope_id_needs_a_citation_even_without_an_rfc_keyword() {
+    let run = xtask_at(&fixture("no_keyword"), &["trace-check"]);
+    assert!(!run.ok(), "{}", run.json);
+    assert_eq!(ids_of(&run.json, "missing"), vec!["FIX-1"], "{}", run.json);
+}
+
+/// Cites: CON-12
+#[test]
+fn dangling_id_references_in_docs_and_hypotheses_fail() {
+    let run = xtask_at(&fixture("refs"), &["trace-check"]);
+    assert!(!run.ok(), "{}", run.json);
+    // FIX-21 docs/decisions/lab/note.md (only docs/lab itself is exempt), FIX-22 fenced block in
+    // PLAN.md (fences outside specs/ hold real references), FIX-33 .github PR template,
+    // FIX-44 and FIX-55 second endpoints of ranges in PLAN.md, FIX-66 hypothesis comment,
+    // FIX-77 PLAN.md, FIX-88 ADR. docs/generated, docs/lab and lab/ are not scanned.
+    assert_eq!(
+        ids_of(&run.json, "dangling_references"),
+        vec![
+            "FIX-21", "FIX-22", "FIX-33", "FIX-44", "FIX-55", "FIX-66", "FIX-77", "FIX-88"
+        ],
+        "{}",
+        run.json
+    );
+    let records = run.json["dangling_references"].as_array().expect("array");
+    let at = |id: &str| {
+        let r = records.iter().find(|r| r["id"] == id).expect(id);
+        (
+            r["file"].as_str().expect("file").to_owned(),
+            r["line"].as_u64().expect("line"),
+        )
+    };
+    assert_eq!(at("FIX-77"), ("PLAN.md".to_owned(), 6));
+    assert_eq!(at("FIX-66"), ("hypotheses/p1.toml".to_owned(), 1));
+
+    // `[poc].spec` is read as TOML. Reported: a missing spec under any quoting, a path outside
+    // specs/ or with `..`, a non-numbered target, a value of the wrong type, invalid TOML, and a
+    // file in a directory that only looks exempt. Not reported: p0 (spec exists), p1 (indexed,
+    // unwritten), p5 (the `spec` key sits in another table).
+    let mut specs: Vec<(String, String)> = run.json["dangling_spec_files"]
+        .as_array()
+        .expect("array")
+        .iter()
+        .map(|d| {
+            (
+                d["file"].as_str().expect("file").to_owned(),
+                d["spec"].as_str().expect("spec").to_owned(),
+            )
+        })
+        .collect();
+    specs.sort();
+    let expected = [
+        (
+            "hypotheses/generated/p8.toml",
+            "specs/996-in-a-generated-dir.md",
+        ),
+        ("hypotheses/p2.toml", "specs/999-nowhere.md"),
+        ("hypotheses/p3.toml", "specs/998-single-quoted-nowhere.md"),
+        ("hypotheses/p4.toml", "specs/../hypotheses/p1.toml"),
+        ("hypotheses/p6.toml", "<unparseable TOML>"),
+        ("hypotheses/p7.toml", "<not a string>"),
+        ("hypotheses/p9.toml", "specs/README.md"),
+    ];
+    let expected: Vec<(String, String)> = expected
+        .iter()
+        .map(|(f, s)| ((*f).to_owned(), (*s).to_owned()))
+        .collect();
+    assert_eq!(specs, expected, "{}", run.json);
+    assert!(run.json["dangling_spec_files"][0]["reason"].is_string());
+}
+
+/// Cites: CON-12
+#[test]
+fn each_kind_of_dangling_reference_fails_the_gate_on_its_own() {
+    // One root with only a dangling ID, one with only a dangling spec file: neither
+    // condition may hide behind the other in the `ok` computation.
+    let only_id = tempfile::tempdir().expect("tempdir");
+    copy_dir(&fixture("ok"), only_id.path());
+    std::fs::write(only_id.path().join("PLAN.md"), "Refers to FIX-404.\n").expect("write");
+    let run = xtask_at(only_id.path(), &["trace-check"]);
+    assert!(!run.ok(), "{}", run.json);
+    assert_eq!(ids_of(&run.json, "dangling_references"), vec!["FIX-404"]);
+    assert!(strings(&run.json, "dangling_spec_files").is_empty());
+
+    let only_spec = tempfile::tempdir().expect("tempdir");
+    copy_dir(&fixture("ok"), only_spec.path());
+    std::fs::create_dir(only_spec.path().join("hypotheses")).expect("mkdir");
+    std::fs::write(
+        only_spec.path().join("hypotheses/p1.toml"),
+        "[poc]\nspec = \"specs/404-nowhere.md\"\n",
+    )
+    .expect("write");
+    let run = xtask_at(only_spec.path(), &["trace-check"]);
+    assert!(!run.ok(), "{}", run.json);
+    assert!(strings(&run.json, "dangling_references").is_empty());
+    assert_eq!(
+        run.json["dangling_spec_files"]
+            .as_array()
+            .expect("array")
+            .len(),
+        1
+    );
+}
+
+/// Cites: CON-12
+#[cfg(unix)]
+#[test]
+fn a_symlink_in_a_scanned_tree_is_refused() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    copy_dir(&fixture("ok"), dir.path());
+    std::fs::create_dir_all(dir.path().join("docs")).expect("mkdir");
+    std::fs::write(dir.path().join("hidden.txt"), "FIX-404\n").expect("write");
+    std::os::unix::fs::symlink(
+        dir.path().join("hidden.txt"),
+        dir.path().join("docs/design.md"),
+    )
+    .expect("symlink");
+    let run = xtask_at(dir.path(), &["trace-check"]);
+    assert!(!run.ok(), "{}", run.json);
+    assert!(
+        run.json["error"]
+            .as_str()
+            .expect("error")
+            .contains("symlink"),
+        "{}",
+        run.json
+    );
+}
+
+/// Cites: CON-12
+#[test]
+fn references_to_indexed_but_unwritten_specs_are_forward_not_dangling() {
+    let run = xtask_at(&fixture("refs"), &["trace-check"]);
+    let forward = strings(&run.json, "forward_references");
+    assert!(forward.contains(&"LTR-4".to_owned()), "{}", run.json);
+    assert!(
+        forward.contains(&"specs/910-later.md".to_owned()),
+        "{}",
+        run.json
+    );
+    for not_an_id in ["UTF-8", "ADR-3", "H-1", "SHA-256"] {
+        assert!(!forward.contains(&not_an_id.to_owned()), "{}", run.json);
+    }
+}
+
 /// Cites: CON-12
 #[test]
 fn files_the_compiler_never_sees_cannot_satisfy_a_requirement() {
