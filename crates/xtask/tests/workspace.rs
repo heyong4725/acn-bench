@@ -1132,3 +1132,121 @@ fn every_lab_crate_is_its_own_workspace_root() {
     // CON-19 is not among the rules CON-23 lifts.
     assert!(read("lab/_template/src/main.rs").contains("#![forbid(unsafe_code)]"));
 }
+
+// ---- contribution templates and docs (docs PR). The templates are parsed, not
+// ---- searched: a needle inside a comment, or front matter GitHub would not read,
+// ---- passed the first version of these tests.
+
+/// The Markdown headings of a document, as written.
+fn headings(text: &str) -> Vec<&str> {
+    text.lines().filter(|l| l.starts_with('#')).collect()
+}
+
+/// Cites: CON-10, CON-11
+#[test]
+fn the_pr_template_asks_for_requirement_ids_class_and_labels() {
+    let t = read(".github/pull_request_template.md");
+    // Agents open PRs here and read this file. A comment is invisible in the
+    // rendered page, so it is the one place an instruction could hide.
+    assert!(!t.contains("<!--"), "no HTML comments in the PR template");
+    assert_eq!(
+        headings(&t),
+        [
+            "## What and why",
+            "## Requirement IDs (CON-11)",
+            "## Risk class (CON-10)",
+            "## Interpretations (CON-15)",
+            "## Gates",
+            "## Review (CON-16)",
+        ]
+    );
+    assert!(
+        t.lines()
+            .next()
+            .is_some_and(|l| l.contains("`type(scope): subject`")),
+        "the first line states the title convention (CON-11)"
+    );
+    assert!(t.contains("One spec concern per PR (CON-11)"));
+    assert!(
+        t.contains("| ID | What this PR does for it | Cited by (test) |"),
+        "the requirement-ID table (CON-11: the description MUST list the IDs)"
+    );
+    // The class boxes and the two labels sit on checkbox lines, not in prose.
+    let boxes: Vec<&str> = t.lines().filter(|l| l.starts_with("- [ ] ")).collect();
+    for class in ["**A**", "**B**", "**C**"] {
+        assert_eq!(
+            boxes.iter().filter(|l| l.contains(class)).count(),
+            1,
+            "one checkbox for class {class}"
+        );
+    }
+    for (label, id) in [("`env-change`", "CON-7"), ("`spec-change`", "CON-14")] {
+        assert!(
+            boxes.iter().any(|l| l.contains(label) && l.contains(id)),
+            "a checkbox names {label} with {id}"
+        );
+    }
+    assert!(boxes.iter().any(|l| l.contains("`tools/ci.sh` green")));
+    assert!(boxes.iter().any(|l| l.contains("enforcement point")));
+}
+
+/// Cites: CON-13
+#[test]
+fn a_spec_conflict_issue_template_exists_with_the_mandated_title() {
+    let t = read(".github/ISSUE_TEMPLATE/spec-conflict.md");
+    assert!(
+        !t.contains("<!--"),
+        "no HTML comments in the issue template"
+    );
+    // GitHub reads the template only if the file opens with a closed front-matter
+    // block that has `name` and `about`.
+    let rest = t
+        .strip_prefix("---\n")
+        .expect("the file starts with a front-matter fence");
+    let (front, body) = rest
+        .split_once("\n---\n")
+        .expect("the front matter is closed");
+    let fm = parse_yaml(front, "spec-conflict front matter");
+    assert_eq!(keys(&fm), ["name", "about", "title", "labels"]);
+    for k in ["name", "about"] {
+        assert!(fm[k].as_str().is_some_and(|v| !v.trim().is_empty()), "{k}");
+    }
+    assert_eq!(fm["title"].as_str(), Some("spec-conflict: <ids>"));
+    assert_eq!(fm["labels"].as_str(), Some("spec-conflict"));
+    for field in [
+        "**Requirement IDs:**",
+        "**What the spec says**",
+        "**What the test asserts**",
+        "**Work stopped at**",
+    ] {
+        assert!(body.contains(field), "the body asks for {field}");
+    }
+}
+
+/// The same install command is written in three documents and pinned in CI. They
+/// disagreed once (pinned, unpinned, absent), and an unpinned local cargo-deny can
+/// pass where CI fails.
+///
+/// Cites: CON-9
+#[test]
+fn the_docs_install_the_cargo_deny_version_that_ci_pins() {
+    let ci = workflow(".github/workflows/ci.yml");
+    let tool = ci["jobs"]["gates"]["steps"]
+        .as_vec()
+        .expect("steps")
+        .iter()
+        .find_map(|s| s["with"]["tool"].as_str())
+        .expect("the install step");
+    let version = tool
+        .strip_prefix("cargo-deny@")
+        .expect("cargo-deny@<version>");
+    let command = format!("cargo install cargo-deny --locked --version {version}");
+    for doc in ["README.md", "CONTRIBUTING.md", "GETTING-STARTED.md"] {
+        assert!(read(doc).contains(&command), "{doc} must say `{command}`");
+    }
+    // And the crates the README names are the workspace's crates.
+    let readme = read("README.md");
+    for c in CRATES {
+        assert!(readme.contains(c), "README layout omits {c}");
+    }
+}
