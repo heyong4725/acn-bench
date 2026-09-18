@@ -28,6 +28,10 @@ deny = [
   { crate = "dora-arrow-convert", reason = "CON-20" },
   { crate = "aisle", reason = "CON-20" },
   { crate = "genesis", reason = "CON-20" },
+  # CON-5: fastrand seeds itself from the environment and has too many entry
+  # points to list in clippy.toml, so no substrate crate may depend on it. It is
+  # reachable only through tempfile, a dev-dependency (ADR-8).
+  { crate = "fastrand", reason = "CON-5", wrappers = ["tempfile"] },
 ]
 
 [sources]
