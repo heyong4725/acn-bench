@@ -7,6 +7,8 @@ members = [
   "crates/acn-attrib", "crates/acn-cli", "crates/xtask",
   "tests/accept",   # package `acn-accept`: one integration test per POC
 ]
+# CON-23: lab crates are standalone (own Cargo.lock, own target/, any dependencies).
+exclude = ["lab"]
 
 [workspace.package]
 edition = "2024"
@@ -40,6 +42,7 @@ walkdir = "2"
 syn = { version = "2", features = ["full", "visit"] }
 proc-macro2 = { version = "1", features = ["span-locations"] }
 tempfile = "3"
+yaml-rust2 = { version = "0.13", default-features = false }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -49,3 +52,4 @@ unwrap_used = "deny"
 expect_used = "deny"
 panic = "deny"
 disallowed_methods = "deny"
+disallowed_types = "deny"
