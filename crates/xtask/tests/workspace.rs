@@ -531,7 +531,6 @@ fn the_lab_template_is_its_own_workspace_root() {
     );
 }
 
-<<<<<<< HEAD
 /// Cites: CON-11
 #[test]
 fn the_pr_template_asks_for_requirement_ids_class_and_labels() {
@@ -556,7 +555,8 @@ fn a_spec_conflict_issue_template_exists_with_the_mandated_title() {
         "issue title must start `spec-conflict: <ids>`"
     );
     assert!(t.contains("labels: spec-conflict"));
-=======
+}
+
 /// Cites: CON-9
 #[test]
 fn workflows_cannot_be_quietly_disabled() {
@@ -602,5 +602,4 @@ fn workflows_cannot_be_quietly_disabled() {
             .any(|l| l.trim().starts_with("if:")),
         "pr-check must be unconditional"
     );
->>>>>>> ci/foundation-ci-lab-deny
 }
