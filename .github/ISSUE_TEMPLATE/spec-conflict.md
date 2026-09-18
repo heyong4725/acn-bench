@@ -1,7 +1,7 @@
 ---
 name: Spec conflict (CON-13)
 about: A spec and a test disagree. The implementer stops; neither is changed in the same PR.
-title: "spec-conflict: <IDs>"
+title: "spec-conflict: <ids>"
 labels: spec-conflict
 ---
 
