@@ -24,12 +24,17 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false # build scripts and tests never see the token
       # CON-2: the toolchain is the one pinned in rust-toolchain.toml, never floating stable.
       - run: rustup toolchain install
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - uses: taiki-e/install-action@4076c08d76dba979c11a7285295b0716c1d67908 # v2
         with:
-          tool: cargo-deny
+          # Pinned: the version must not move with every bump of the action. No
+          # fallback: the only install path is the checksum-verified release.
+          tool: cargo-deny@0.20.2
+          fallback: none
       - run: tools/ci.sh
 
   lab:
@@ -37,6 +42,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false # build scripts and tests never see the token
       - run: rustup toolchain install
       - name: fmt and clippy on every lab crate
         run: |
@@ -55,6 +62,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false # build scripts and tests never see the token
       - run: rustup toolchain install
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - run: cargo test --workspace
@@ -66,5 +75,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false # build scripts and tests never see the token
       - run: rustup toolchain install
       - run: sudo -E env "PATH=$PATH" cargo test --workspace --features netem -- --ignored

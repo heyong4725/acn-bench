@@ -12,6 +12,17 @@ use common::{repo_root, strings, xtask_at};
 
 const FULL_CODEOWNERS: &str = "\
 # owners
+/.github/workflows/              @owner
+/.github/dependabot.yml          @owner
+/.cargo/                         @owner
+/Cargo.toml                      @owner
+/Cargo.lock                      @owner
+/clippy.toml                     @owner
+/deny.toml                       @owner
+/rust-toolchain.toml             @owner
+/tools/ci.sh                     @owner
+/crates/xtask/                   @owner
+/lab/clippy.toml                 @owner
 /hypotheses/                     @owner
 /scenarios/measured/             @owner
 /crates/acn-hyp/                 @owner
@@ -372,6 +383,25 @@ fn the_gate_records_and_codeowners_itself_are_protected() {
         let dir = root_with(&FULL_CODEOWNERS.replace(line, ""), false);
         let run = xtask_at(dir.path(), &["pr-check"]);
         assert_eq!(strings(&run.json, "codeowners_missing"), vec![pattern]);
+    }
+}
+
+/// Cites: LOOP-20, CON-9
+#[test]
+fn every_enforcement_point_needs_an_owner() {
+    assert!(
+        xtask::pr_check::ENFORCEMENT_POINTS.len() >= 11,
+        "the list only grows"
+    );
+    for point in xtask::pr_check::ENFORCEMENT_POINTS {
+        let line = FULL_CODEOWNERS
+            .lines()
+            .find(|l| l.split_whitespace().next() == Some(point))
+            .unwrap_or_else(|| panic!("fixture lacks {point}"));
+        let dir = root_with(&FULL_CODEOWNERS.replace(&format!("{line}\n"), ""), false);
+        let run = xtask_at(dir.path(), &["pr-check"]);
+        assert!(!run.ok(), "{point}: {}", run.json);
+        assert_eq!(strings(&run.json, "codeowners_missing"), vec![*point]);
     }
 }
 
