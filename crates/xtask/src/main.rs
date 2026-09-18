@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 use serde_json::{Value, json};
-use xtask::{docs_inventory, env_hash, logging, trace_check, workspace};
+use xtask::{docs_inventory, env_hash, logging, pr_check, trace_check, workspace};
 
 #[derive(Parser)]
 #[command(
@@ -37,6 +37,18 @@ enum Cmd {
         check: bool,
         #[arg(long)]
         write: bool,
+    },
+    /// CON-14, CON-7, LOOP-20: PR label rules and CODEOWNERS coverage of protected paths.
+    PrCheck {
+        /// Diff against this git ref (`git diff --name-only <base>...HEAD`).
+        #[arg(long, conflicts_with = "changed")]
+        base: Option<String>,
+        /// Comma-separated changed paths, instead of reading them from git.
+        #[arg(long)]
+        changed: Option<String>,
+        /// Comma-separated PR labels.
+        #[arg(long, default_value = "")]
+        labels: String,
     },
 }
 
@@ -72,6 +84,25 @@ fn run() -> Value {
                 env_hash::Mode::Print
             };
             to_json(env_hash::run(&root, mode))
+        }
+        Cmd::PrCheck {
+            base,
+            changed,
+            labels,
+        } => {
+            let split = |s: &str| -> Vec<String> {
+                s.split(',')
+                    .map(str::trim)
+                    .filter(|x| !x.is_empty())
+                    .map(str::to_owned)
+                    .collect()
+            };
+            let changes = match (base, changed) {
+                (Some(b), _) => pr_check::Changes::GitBase(b),
+                (None, Some(c)) => pr_check::Changes::List(split(&c)),
+                (None, None) => pr_check::Changes::None,
+            };
+            to_json(pr_check::run(&root, changes, &split(&labels)))
         }
     }
 }

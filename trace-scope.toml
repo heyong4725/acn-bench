@@ -4,7 +4,7 @@
 
 [[implemented]]
 spec = "000"
-ids = ["CON-2", "CON-6", "CON-7", "CON-8", "CON-9", "CON-12", "CON-19", "CON-20"]
+ids = ["CON-2", "CON-6", "CON-7", "CON-8", "CON-9", "CON-12", "CON-14", "CON-19", "CON-20"]
 
 # Not yet in scope although cited: CON-5 (only its clippy clause exists until
 # acn_emu::{clock,rng} land in T10–T12). Citing ahead of scope is allowed (ADR-3 §1).

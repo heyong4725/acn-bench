@@ -155,3 +155,57 @@ fn a_root_without_specs_is_an_error_not_a_pass() {
         run.json
     );
 }
+
+fn ids_of(v: &serde_json::Value, key: &str) -> Vec<String> {
+    let mut ids: Vec<String> = v[key]
+        .as_array()
+        .unwrap_or_else(|| panic!("{key} array"))
+        .iter()
+        .map(|x| x["id"].as_str().expect("id").to_owned())
+        .collect();
+    ids.sort();
+    ids
+}
+
+/// Cites: CON-12
+#[test]
+fn an_in_scope_id_needs_a_citation_even_without_an_rfc_keyword() {
+    let run = xtask_at(&fixture("no_keyword"), &["trace-check"]);
+    assert!(!run.ok(), "{}", run.json);
+    assert_eq!(ids_of(&run.json, "missing"), vec!["FIX-1"], "{}", run.json);
+}
+
+/// Cites: CON-12
+#[test]
+fn dangling_id_references_in_docs_and_hypotheses_fail() {
+    let run = xtask_at(&fixture("refs"), &["trace-check"]);
+    assert!(!run.ok(), "{}", run.json);
+    // FIX-77 (PLAN.md), FIX-88 (ADR), FIX-66 (hypothesis comment); generated docs, lab notes and lab/ are not scanned.
+    assert_eq!(
+        ids_of(&run.json, "dangling_references"),
+        vec!["FIX-66", "FIX-77", "FIX-88"],
+        "{}",
+        run.json
+    );
+    // The only other failure is the hypothesis pointing at a spec that is neither present nor indexed.
+    let files = run.json["dangling_spec_files"].as_array().expect("array");
+    assert_eq!(files.len(), 1, "{}", run.json);
+    assert_eq!(files[0]["spec"], "specs/999-nowhere.md");
+    assert_eq!(files[0]["file"], "hypotheses/p2.toml");
+}
+
+/// Cites: CON-12
+#[test]
+fn references_to_indexed_but_unwritten_specs_are_forward_not_dangling() {
+    let run = xtask_at(&fixture("refs"), &["trace-check"]);
+    let forward = strings(&run.json, "forward_references");
+    assert!(forward.contains(&"LTR-4".to_owned()), "{}", run.json);
+    assert!(
+        forward.contains(&"specs/910-later.md".to_owned()),
+        "{}",
+        run.json
+    );
+    for not_an_id in ["UTF-8", "ADR-3", "H-1", "SHA-256"] {
+        assert!(!forward.contains(&not_an_id.to_owned()), "{}", run.json);
+    }
+}

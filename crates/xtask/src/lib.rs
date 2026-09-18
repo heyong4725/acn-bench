@@ -11,6 +11,8 @@ pub mod env_hash;
 pub mod error;
 pub mod logging;
 pub mod model;
+pub mod pr_check;
+pub mod refs;
 pub mod scope;
 pub mod specs;
 pub mod trace_check;
