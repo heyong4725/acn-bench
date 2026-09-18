@@ -374,3 +374,29 @@ fn ci_has_a_nightly_trigger_for_the_nightly_tiers() {
         "nightly tiers need a schedule trigger"
     );
 }
+
+/// Cites: CON-11
+#[test]
+fn the_pr_template_asks_for_requirement_ids_class_and_labels() {
+    let t = read(".github/pull_request_template.md");
+    for needle in [
+        "Requirement IDs",
+        "Risk class",
+        "spec-change",
+        "env-change",
+        "tools/ci.sh",
+    ] {
+        assert!(t.contains(needle), "PR template must mention `{needle}`");
+    }
+}
+
+/// Cites: CON-13
+#[test]
+fn a_spec_conflict_issue_template_exists_with_the_mandated_title() {
+    let t = read(".github/ISSUE_TEMPLATE/spec-conflict.md");
+    assert!(
+        t.contains("title: \"spec-conflict: "),
+        "issue title must start `spec-conflict: <ids>`"
+    );
+    assert!(t.contains("labels: spec-conflict"));
+}

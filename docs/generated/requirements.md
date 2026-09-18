@@ -2,7 +2,7 @@
 
 # Requirement inventory
 
-Specs: 3 · IDs: 71 · MUSTs: 50 · implemented: 9 · cited: 13
+Specs: 3 · IDs: 71 · MUSTs: 50 · implemented: 9 · cited: 15
 
 | ID | Spec | § | Level | Implemented | Cited by |
 |---|---|---|---|---|---|
@@ -16,9 +16,9 @@ Specs: 3 · IDs: 71 · MUSTs: 50 · implemented: 9 · cited: 13
 | CON-8 | `000-constitution.md` | 3 | MUST | yes | `crates/acn-cli/tests/cli_contract.rs` `version_prints_one_json_object_and_exits_zero`<br>`crates/acn-cli/tests/cli_contract.rs` `unknown_subcommand_is_a_json_error_with_exit_one`<br>`crates/xtask/tests/env_hash.rs` `env_hash_honours_the_json_contract_on_both_outcomes`<br>`crates/xtask/tests/pr_check.rs` `pr_check_base_mode_reads_the_diff_from_git`<br>`crates/xtask/tests/trace_check_selfhost.rs` `trace_check_emits_one_json_object_and_exit_code_tracks_ok`<br>`crates/xtask/tests/trace_check_selfhost.rs` `argument_errors_still_honour_the_json_contract` |
 | CON-9 | `000-constitution.md` | 3 | MAY | yes | `crates/xtask/tests/docs_inventory.rs` `check_fails_until_generated_docs_are_written_then_passes`<br>`crates/xtask/tests/docs_inventory.rs` `generation_is_deterministic`<br>`crates/xtask/tests/docs_inventory.rs` `self_host_generated_docs_are_current`<br>`crates/xtask/tests/workspace.rs` `ci_script_chains_the_gates_in_order` |
 | CON-10 | `000-constitution.md` | 3 | — | no | — |
-| CON-11 | `000-constitution.md` | 3 | MUST | no | — |
+| CON-11 | `000-constitution.md` | 3 | MUST | no | `crates/xtask/tests/workspace.rs` `the_pr_template_asks_for_requirement_ids_class_and_labels` |
 | CON-12 | `000-constitution.md` | 4 | MUST | yes | `crates/xtask/tests/trace_check_selfhost.rs` `passes_when_every_implemented_must_is_cited`<br>`crates/xtask/tests/trace_check_selfhost.rs` `fails_on_an_uncited_must_in_an_implemented_section`<br>`crates/xtask/tests/trace_check_selfhost.rs` `fails_on_a_citation_of_a_nonexistent_id`<br>`crates/xtask/tests/trace_check_selfhost.rs` `fails_when_a_citation_is_not_attached_to_a_function`<br>`crates/xtask/tests/trace_check_selfhost.rs` `ids_inside_code_fences_are_not_requirements`<br>`crates/xtask/tests/trace_check_selfhost.rs` `self_host_the_real_workspace_passes`<br>`crates/xtask/tests/trace_check_selfhost.rs` `fails_when_a_citation_is_on_a_non_test_function`<br>`crates/xtask/tests/trace_check_selfhost.rs` `accepts_continuations_and_attribute_placements`<br>`crates/xtask/tests/trace_check_selfhost.rs` `a_root_without_specs_is_an_error_not_a_pass`<br>`crates/xtask/tests/trace_check_selfhost.rs` `an_in_scope_id_needs_a_citation_even_without_an_rfc_keyword`<br>`crates/xtask/tests/trace_check_selfhost.rs` `dangling_id_references_in_docs_and_hypotheses_fail`<br>`crates/xtask/tests/trace_check_selfhost.rs` `references_to_indexed_but_unwritten_specs_are_forward_not_dangling`<br>`crates/xtask/tests/workspace.rs` `ci_has_a_nightly_trigger_for_the_nightly_tiers` |
-| CON-13 | `000-constitution.md` | 4 | MUST | no | — |
+| CON-13 | `000-constitution.md` | 4 | MUST | no | `crates/xtask/tests/workspace.rs` `a_spec_conflict_issue_template_exists_with_the_mandated_title` |
 | CON-14 | `000-constitution.md` | 4 | MUST | yes | `crates/xtask/tests/pr_check.rs` `a_spec_edit_without_the_spec_change_label_fails`<br>`crates/xtask/tests/pr_check.rs` `ordinary_changes_need_no_label`<br>`crates/xtask/tests/workspace.rs` `ci_runs_pr_check_with_the_labels_and_reruns_when_labels_change` |
 | CON-15 | `000-constitution.md` | 4 | MUST | no | — |
 | CON-16 | `000-constitution.md` | 4 | MUST | no | — |

@@ -19,12 +19,13 @@ gh auth login
 mkdir -p ~/src && cd ~/src
 unzip ~/Downloads/acn-bench-plan.zip && mv acnbench acn-bench && cd acn-bench
 git init -b main
-gh repo create acn-bench --public --license apache-2.0 --source=. --remote=origin --description "ACN experimental substrate and POC catalogue (Rust)"
+gh repo create acn-bench --public --source=. --remote=origin --description "ACN experimental substrate and POC catalogue (Rust)"
+gh api licenses/apache-2.0 --jq .body > LICENSE      # `gh repo create` rejects --license together with --source
 git add -A && git commit -m "chore: plan, constitution, SPEC 010, tasks, workspace skeleton"
 git push -u origin main
 ```
 
-`gh repo create --license apache-2.0` adds the LICENSE file; add a NOTICE line with the Futurewei copyright if legal asks for one.
+Add a NOTICE line with the Futurewei copyright if legal asks for one.
 
 Then, in the GitHub UI or with `gh`:
 
@@ -33,13 +34,26 @@ gh label create spec-change   --color 1d76db --description "Edits under specs/ (
 gh label create env-change    --color d93f0b --description "Edits to the frozen set (CON-7)"
 gh label create spec-conflict --color b60205 --description "A spec and a test disagree (CON-13)"
 gh label create lab           --color 0e8a16 --description "Exploration track (CON-23)"
-gh api -X PUT repos/{owner}/acn-bench/branches/main/protection \
-  -f required_status_checks.strict=true -f 'required_status_checks.contexts[]=gates (macos-latest)' \
-  -f 'required_status_checks.contexts[]=gates (ubuntu-latest)' -f enforce_admins=false \
-  -f required_pull_request_reviews.required_approving_review_count=1 -F restrictions=null
+
+# Branch protection takes nested JSON; gh's dotted -f keys do not build it.
+cat > /tmp/protection.json <<'JSON'
+{
+  "required_status_checks": { "strict": true,
+    "contexts": ["gates (macos-latest)", "gates (ubuntu-latest)", "pr-check"] },
+  "enforce_admins": false,
+  "required_pull_request_reviews": { "required_approving_review_count": 1 },
+  "restrictions": null
+}
+JSON
+gh api -X PUT repos/{owner}/acn-bench/branches/main/protection --input /tmp/protection.json
+
+# Squash-merge only; the PR title becomes the mainline commit subject (CON-11).
+gh api -X PATCH repos/{owner}/acn-bench -F allow_squash_merge=true -F allow_merge_commit=false \
+  -F allow_rebase_merge=false -f squash_merge_commit_title=PR_TITLE -f squash_merge_commit_message=PR_BODY \
+  -F delete_branch_on_merge=true
 ```
 
-Squash-merge only (repo Settings → General → Pull Requests): the PR title becomes the mainline commit subject (CON-11).
+With one maintainer, the one-approval rule means you merge your own PRs as admin (`gh pr merge <n> --squash --admin`) after the agent cross-review; add a second reviewer account when there is one.
 
 ## 3. Secrets
 
@@ -80,7 +94,7 @@ the server already holds. Measure bytes on the wire and turn completion time wit
 without a 2-second gap, against a plain HTTP/1.1 + SSE baseline in the same crate.
 ```
 
-It needs no substrate; it needs only Rust. The lab note is the deliverable.
+It needs no substrate; it needs only Rust. `lab/` is excluded from the workspace, so `cargo new lab/turn-transport` gives a standalone crate (gates in `lab/README.md`). The lab note is the deliverable.
 
 ## 6. Day two onward
 
