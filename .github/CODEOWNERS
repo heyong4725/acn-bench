@@ -5,3 +5,5 @@
 /crates/acn-attrib/src/core/     @heyong4725
 /crates/acn-trace/src/schema/    @heyong4725
 /specs/                          @heyong4725
+/env-hash.json                   @heyong4725
+/trace-scope.toml                @heyong4725

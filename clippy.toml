@@ -6,3 +6,7 @@ disallowed-methods = [
   { path = "rand::thread_rng", reason = "CON-5: use the injected ChaCha20Rng" },
   { path = "std::thread::sleep", reason = "CON-3/CON-5: no blocking sleeps on the run path" },
 ]
+# CON-19: the unwrap/expect/panic lints are denied in library targets; tests are exempt.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true

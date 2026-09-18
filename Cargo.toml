@@ -1,4 +1,4 @@
-# Dependency versions are placeholders to be pinned at T01 (cargo update, then commit Cargo.lock).
+# Workspace manifest. Cargo.lock is committed (T01); bump dependency versions here in the PR that first uses them.
 [workspace]
 resolver = "3"
 members = [
@@ -36,6 +36,10 @@ opentelemetry_sdk = "0.30"
 tracing-opentelemetry = "0.31"
 zstd = "0.13"
 proptest = "1"
+walkdir = "2"
+syn = { version = "2", features = ["full", "visit"] }
+proc-macro2 = { version = "1", features = ["span-locations"] }
+tempfile = "3"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
