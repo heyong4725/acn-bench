@@ -24,7 +24,6 @@ const OUTSIDE_FILES: &[&str] = &[
     "scenarios/synthetic/a.toml",
     "lab/hypotheses/p17-a2a.toml",
     "specs/000-constitution.md",
-    "scenarios/measured/.gitkeep",
 ];
 
 fn write(root: &Path, rel: &str, body: &str) {
@@ -38,6 +37,8 @@ fn frozen_fixture() -> tempfile::TempDir {
     for f in FROZEN_FILES.iter().chain(OUTSIDE_FILES) {
         write(dir.path(), f, &format!("content of {f}\n"));
     }
+    // An empty placeholder is the one thing the walk skips.
+    write(dir.path(), "scenarios/measured/.gitkeep", "");
     dir
 }
 
@@ -137,6 +138,7 @@ fn env_hash_honours_the_json_contract_on_both_outcomes() {
 }
 
 /// Cites: CON-7
+#[cfg(unix)]
 #[test]
 fn symlinks_inside_the_frozen_set_are_refused() {
     let dir = frozen_fixture();
@@ -151,7 +153,7 @@ fn symlinks_inside_the_frozen_set_are_refused() {
         run.json["error"]
             .as_str()
             .expect("error")
-            .contains("symlink"),
+            .contains("symlink or special file"),
         "{}",
         run.json
     );
@@ -195,4 +197,96 @@ fn check_failure_reports_the_per_file_diff_and_a_hint() {
             .expect("error")
             .contains("env-hash.json")
     );
+}
+
+/// Cites: CON-7
+#[test]
+fn a_placeholder_with_content_is_frozen_content() {
+    // `#[path = ".gitkeep"] mod x;` or `include!` can turn any file name into code.
+    let dir = frozen_fixture();
+    let base = hash_of(dir.path());
+    write(
+        dir.path(),
+        "crates/acn-hyp/src/.gitkeep",
+        "pub const THRESHOLD: f64 = 0.05;\n",
+    );
+    let with_code = hash_of(dir.path());
+    assert_ne!(with_code, base);
+    write(
+        dir.path(),
+        "crates/acn-hyp/src/.gitkeep",
+        "pub const THRESHOLD: f64 = 0.99;\n",
+    );
+    assert_ne!(hash_of(dir.path()), with_code);
+
+    write(dir.path(), "hypotheses/.DS_Store", "finder junk");
+    let run = xtask_at(dir.path(), &["env-hash"]);
+    assert!(!run.ok(), "{}", run.json);
+    assert!(
+        run.json["error"]
+            .as_str()
+            .expect("error")
+            .contains(".DS_Store")
+    );
+}
+
+/// Cites: CON-7
+#[test]
+fn check_verifies_the_whole_record_not_only_the_top_level_hash() {
+    let dir = frozen_fixture();
+    assert!(xtask_at(dir.path(), &["env-hash", "--write"]).ok());
+    write(dir.path(), "hypotheses/p4.toml", "changed\n");
+    let new_hash = hash_of(dir.path());
+
+    // Forge only the top-level value; every per-file hash still says "nothing moved".
+    let record = dir.path().join("env-hash.json");
+    let mut json: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&record).expect("read")).expect("json");
+    json["env_hash"] = serde_json::Value::String(new_hash);
+    fs::write(&record, serde_json::to_string_pretty(&json).expect("ser")).expect("write");
+
+    let run = xtask_at(dir.path(), &["env-hash", "--check"]);
+    assert!(!run.ok(), "{}", run.json);
+    assert!(
+        run.json["error"]
+            .as_str()
+            .expect("error")
+            .contains("inconsistent"),
+        "{}",
+        run.json
+    );
+}
+
+/// Cites: CON-7
+#[test]
+fn a_missing_frozen_directory_or_a_bad_root_is_an_error_not_an_empty_set() {
+    let dir = frozen_fixture();
+    fs::remove_dir_all(dir.path().join("scenarios/measured")).expect("rm");
+    let run = xtask_at(dir.path(), &["env-hash"]);
+    assert!(!run.ok(), "{}", run.json);
+    assert!(
+        run.json["error"]
+            .as_str()
+            .expect("error")
+            .contains("scenarios/measured"),
+        "{}",
+        run.json
+    );
+
+    let nowhere = dir.path().join("does-not-exist");
+    let run = xtask_at(&nowhere, &["env-hash"]);
+    assert!(!run.ok(), "{}", run.json);
+}
+
+/// Cites: CON-7
+#[test]
+fn write_repairs_a_corrupt_record() {
+    let dir = frozen_fixture();
+    fs::write(dir.path().join("env-hash.json"), "<<<<<<< HEAD\n{ not json").expect("write");
+    assert!(!xtask_at(dir.path(), &["env-hash", "--check"]).ok());
+    assert!(
+        xtask_at(dir.path(), &["env-hash", "--write"]).ok(),
+        "the advised command must work"
+    );
+    assert!(xtask_at(dir.path(), &["env-hash", "--check"]).ok());
 }
