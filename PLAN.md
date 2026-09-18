@@ -104,7 +104,7 @@ Each gate is a spec (095) with an acceptance suite; a gate closes with a human-m
 - `Clock` trait with `SimClock` (virtual) and `WallClock`; no direct `Instant::now()` or `SystemTime::now()` outside `acn-emu::clock` (clippy `disallowed_methods` enforces it).
 - `Rng` injected as `rand_chacha::ChaCha20Rng` seeded from the run seed; sub-streams derived per component by name (`seed_for("emu.link0")`) so adding a component does not shift others.
 - Async: tokio with `start_paused = true` in `sim`; in `live`, all impairment schedules are precomputed from the seed before traffic starts, so the schedule is deterministic even if socket timing is not.
-- Every bundle carries `run_id = blake3(seed ‖ scenario_hash ‖ workload_hash ‖ hypothesis_hash ‖ env_hash)`; `acn bundle verify` recomputes it.
+- Every bundle carries a `run_id` derived from the seed, the scenario, workload, hypothesis and environment hashes, the mode and the run parameters, encoded exactly as CON-27(b) specifies; `acn bundle verify` recomputes it. The manifest also carries `build_hash` (CON-27e), which names the binary.
 - Floating-point reductions in `acn-attrib` use fixed summation order; no parallel reduction without a deterministic reducer.
 
 ## 7. Quality gates (CON-9)
@@ -129,7 +129,7 @@ cargo deny check                          # licenses + advisories
 
 ## 8a. Sim ↔ live twin rule (CON-25)
 
-A deterministic simulator can be a beautiful model of the wrong thing. From M1 on, any scenario whose `sim` result is cited also runs in `live` on the same scenario and seed schedule, and the divergence between the two (per measured quantity, with tolerance declared in the hypothesis file) is recorded in the bundle and tracked as a metric in `docs/gates/`. When they drift, the simulator is presumed wrong until shown otherwise. The `netem` backend at M4 extends the same rule to kernel-level impairment.
+A deterministic simulator can be a beautiful model of the wrong thing. From M1 on, any scenario whose `sim` result is cited also runs in `live` on the same scenario and seed schedule, and the divergence between the two (per measured quantity, with tolerance declared in the hypothesis file) is computed by `acn hyp verdict`, recorded in the verdict and tracked as a metric in `docs/gates/`. When they drift, the simulator is presumed wrong until shown otherwise. The `netem` backend at M4 extends the same rule to kernel-level impairment.
 
 ## 8b. Mock inference is a model, not a result
 

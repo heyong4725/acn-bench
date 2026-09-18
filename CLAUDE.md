@@ -27,7 +27,7 @@ cargo fmt --all --check \
 
 - **Specs are read-only.** You MUST NOT edit `specs/` except in a PR labelled `spec-change` with a rationale (CON-14). If a spec and a test disagree, STOP and open an issue `spec-conflict: <ids>` (CON-13).
 - **Frozen hypotheses are frozen.** You MUST NOT edit `hypotheses/*.toml` or anything in the frozen set (CON-7). Candidate hypotheses in `lab/hypotheses/` are yours to edit and iterate on; freezing one is a Class C PR (CON-17). A negative result on a frozen hypothesis is reported, not re-hypothesised.
-- **Sim has a live twin.** Any sim number you intend to cite runs in live on the same scenario; record the divergence in the bundle (CON-25). If they disagree, the simulator is wrong until shown otherwise.
+- **Sim has a live twin.** Any sim number you intend to cite runs in live on the same scenario; `acn hyp verdict` records the divergence in the verdict (CON-25). If they disagree, the simulator is wrong until shown otherwise.
 - **Mock is not a result.** Bundles on `acn-mockllm` are labelled and never cited (CON-26). Provider-behaviour hypotheses (caching, streaming) are instantiated per provider.
 - **The loop is layered (SPEC 085).** L0 build → L1 sim → L2 twin → L3 reality → L4 human. Use `acn loop run/twin/promote`; a layer never consumes unverified output from the layer below, and results at L1–L3 never edit frozen hypotheses or specs. Cite only `docs/evidence/` pages.
 - **Every experiment has a control.** A POC acceptance suite that lacks the non-agent/plain-RPC control named in its spec is incomplete (CON-18).

@@ -2,7 +2,7 @@
 
 # Requirement inventory
 
-Specs: 4 · IDs: 98 · MUSTs: 93 · implemented: 8 · cited: 15
+Specs: 4 · IDs: 100 · MUSTs: 95 · implemented: 8 · cited: 15
 
 | ID | Spec | § | Level | Implemented | Cited by |
 |---|---|---|---|---|---|
@@ -63,6 +63,8 @@ Specs: 4 · IDs: 98 · MUSTs: 93 · implemented: 8 · cited: 15
 | TRC-34 | `010-trace-schema.md` | 7 | MUST | no | — |
 | TRC-35 | `010-trace-schema.md` | 7 | MUST | no | — |
 | TRC-36 | `010-trace-schema.md` | 7 | MUST | no | — |
+| TRC-37 | `010-trace-schema.md` | 7 | MUST | no | — |
+| TRC-38 | `010-trace-schema.md` | 7 | MUST | no | — |
 | TRC-40 | `010-trace-schema.md` | 8 | MUST | no | — |
 | TRC-41 | `010-trace-schema.md` | 8 | MUST | no | — |
 | TRC-42 | `010-trace-schema.md` | 8 | MUST | no | — |
