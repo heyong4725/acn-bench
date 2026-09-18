@@ -28,17 +28,17 @@ Maturity is the known cost. As of July 2026 the GenAI conventions live in their 
 
 ## 3. Span profile
 
-Span names follow the GenAI conventions where they exist; `acn.*` names are used for what they do not cover. The attributes each span MUST carry are in addition to the convention's own.
+Span names follow the GenAI conventions where they exist; `acn.*` names are used for what they do not cover. The attributes each span MUST carry are in addition to the convention's own. An attribute marked *optional* MUST be present when its stated condition holds and MUST be absent, never zero or empty, otherwise.
 
-**TRC-10** `acn.session` (root, kind INTERNAL) — one per harness or generator session. MUST carry: `acn.run_id`, `acn.hypothesis.id`, `acn.hypothesis.status` (`candidate`|`frozen`), `acn.backend` (`mockllm`|`anthropic`|`openai`|`vllm`|`sglang`|…), `acn.mode` (`sim`|`live`|`netem`), `acn.scenario.hash`, `acn.workload.hash`, `acn.seed`, `acn.replicate`, `acn.role` (`treatment`|`control`), `acn.harness.knobs` (JSON string of the knob map in force, SPEC 040).
+**TRC-10** `acn.session` (root, kind INTERNAL) — one per harness or generator session. MUST carry: `acn.run_id`, `acn.hypothesis.id`, `acn.hypothesis.status` (`candidate`|`frozen`), `acn.backend` (`mockllm`|`anthropic`|`openai`|`vllm`|`sglang`|…), `acn.mode` (`sim`|`live`|`netem`), `acn.scenario.hash`, `acn.workload.hash`, `acn.seed`, `acn.replicate`, `acn.role` (`treatment`|`control`|`researcher`, the last for LOOP-21 sessions), `acn.harness.knobs` (JSON string of the knob map in force, SPEC 040).
 
-**TRC-11** `acn.turn` (child of session, kind INTERNAL) — one per harness turn. MUST carry: `acn.turn.index`, `acn.turn.deadline_ms` (absent if none), `acn.turn.outcome` (`success`|`failure`|`timeout`|`aborted`), `acn.turn.first_useful_result_ms` (offset from turn start; absent if none), `acn.turn.compaction` (`none`|`window_full`|`read_cost_threshold`).
+**TRC-11** `acn.turn` (child of session, kind INTERNAL) — one per harness turn. MUST carry: `acn.turn.index`, `acn.turn.deadline_ms` (optional: the turn has a deadline), `acn.turn.outcome` (`success`|`failure`|`timeout`|`aborted`), `acn.turn.first_useful_result_ms` (offset from turn start; optional: a useful result was produced), `acn.turn.compaction` (`none`|`window_full`|`read_cost_threshold`).
 
-**TRC-12** `chat` (child of turn, kind CLIENT) — one per model call, per GenAI conventions (`gen_ai.operation.name = "chat"`, `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, and the v1.40 cache-token attributes where the provider reports them). MUST carry `acn.*`: `acn.call.index`, `acn.call.input_tokens`, `acn.call.new_input_tokens` (input tokens not present in the previous call of the same session; equal to `input_tokens` on the first call and on the first call after a compaction), `acn.call.output_tokens`, `acn.call.stop_reason` (`end_turn`|`tool_use`|`max_tokens`|`stop_sequence`|`error`|`other`, normalised per provider in the same mapping table as TRC-21), `acn.cache.read_tokens`, `acn.cache.write_tokens` (0 when the provider has no such concept), `acn.call.ttft_ms`, `acn.call.itl_p50_ms`, `acn.call.itl_p99_ms`, `acn.call.wire_bytes_up`, `acn.call.wire_bytes_down`, `acn.call.streamed` (bool), `acn.call.retries`, `acn.call.error_class` (absent if none). Span events: `acn.stream.first_token`, `acn.stream.last_token`, one `acn.stream.stall` event per gap > `acn.stall_threshold_ms` (default 250) with attributes `gap_ms`, `tokens_before`.
+**TRC-12** `chat` (child of turn, kind CLIENT) — one per model call, per GenAI conventions (`gen_ai.operation.name = "chat"`, `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, and the v1.40 cache-token attributes where the provider reports them). MUST carry `acn.*`: `acn.call.index`, `acn.call.input_tokens` (the **total** prompt length in tokens, cached or not: providers differ, Anthropic's `usage.input_tokens` excludes cached tokens and OpenAI's `prompt_tokens` includes them, so the per-provider mapping of TRC-21 MUST produce the total), `acn.call.new_input_tokens` (`input_tokens` minus the token length of the longest common prefix between this call's input and the previous call's input followed by its output, where *previous* means the previous `chat` in the same context lineage — the turn's main chain or the enclosing `invoke_agent` — and, for the first call of a lineage, the parent's context at spawn time; computed by the harness or generator, which holds the token sequences; never negative; equal to `input_tokens` when there is no previous context), `acn.call.output_tokens`, `acn.call.stop_reason` (`end_turn`|`tool_use`|`max_tokens`|`stop_sequence`|`content_filter`|`client_abort`|`transport_error`|`other`; optional: the call ended with a provider stop reason or was cut by the client or the link; normalised per provider in the mapping table of TRC-21, where an OpenAI-compatible `stop` maps to `end_turn`) and `acn.call.stop_reason_raw` (the provider's own value; optional: the provider reported one), `acn.cache.read_tokens`, `acn.cache.write_tokens` (0 when the provider has no such concept), `acn.call.ttft_ms` (optional: at least one token arrived), `acn.call.itl_p50_ms` and `acn.call.itl_p99_ms` (optional: streamed, at least two tokens), `acn.call.wire_bytes_up`, `acn.call.wire_bytes_down`, `acn.call.streamed` (bool), `acn.call.retries`, `acn.call.error_class` (optional: the call failed). Span events: `acn.stream.first_token`, `acn.stream.last_token`, one `acn.stream.stall` event per gap > `acn.stall_threshold_ms` (default 250) with attributes `gap_ms`, `tokens_before`.
 
 **TRC-13** `execute_tool` (child of turn, kind INTERNAL or CLIENT) — one per tool call, per GenAI conventions (`gen_ai.tool.name`, `gen_ai.tool.call.id`). MUST carry `acn.*`: `acn.tool.class` (`file`|`shell`|`search`|`http`|`subagent`|`testbed`|`other`), `acn.tool.result_bytes`, `acn.tool.placement` (`local`|`remote`).
 
-**TRC-14** `invoke_agent` (child of turn or of another `invoke_agent`, kind INTERNAL) — one per sub-agent spawn, per conventions. MUST carry: `acn.fanout.parent_turn`, `acn.fanout.width` (on the parent at spawn time), `acn.fanout.shared_prefix_tokens`.
+**TRC-14** `invoke_agent` (child of turn or of another `invoke_agent`, kind INTERNAL) — one per sub-agent spawn, per conventions. MUST carry: `acn.fanout.parent_turn`, `acn.fanout.parent_call` (the `acn.call.index` of the `chat` whose response spawned it), `acn.fanout.depth` (1 for a child of the main chain), `acn.fanout.width` (the number of siblings spawned by the same parent call, this one included), `acn.fanout.shared_prefix_tokens`.
 
 **TRC-15** `acn.link` (kind INTERNAL, emitted by `acn-emu`) — one per message or byte-segment crossing the boundary, parented to the call whose traffic it carries via propagated context (or by the proxy's flow map when the payload is opaque). MUST carry: `acn.link.id`, `acn.link.direction` (`up`|`down`), `acn.link.bytes`, `acn.link.enqueue_ns`, `acn.link.dequeue_ns`, `acn.link.applied_delay_ms`, `acn.link.dropped` (bool), `acn.link.reordered` (bool), `acn.link.rate_limited_ms`, `acn.link.model` (scenario link-model name). Span events on the link's parent scenario span: `acn.scenario.step` (`step`, `params` JSON), `acn.scenario.outage` (`start_ns`, `end_ns`, `cause` = `handover`|`scheduled`|`trace`).
 
@@ -48,7 +48,7 @@ Span names follow the GenAI conventions where they exist; `acn.*` names are used
 
 **TRC-18** External inference-node spans (vLLM, SGLang) are ingested unmodified; the ingester (TRC-30) MUST attach them to the `chat` span whose `traceparent` they carry and MUST derive `acn.server.queue_ms`, `acn.server.prefill_ms`, `acn.server.decode_ms` from them when the node's conventions allow, else leave those attributes absent (never zero).
 
-**TRC-19** Every producer MUST set resource attributes `service.name` (crate name), `service.version` (crate version), `acn.env_hash`, `acn.build.git_sha`.
+**TRC-19** Every producer MUST set resource attributes `service.name` (crate name), `service.version` (crate version), `acn.env_hash`, `acn.build_hash` (CON-27e). A git commit identifier MUST NOT appear in any file covered by TRC-24: two builds of identical source from different commits would otherwise differ; it MAY be written under `logs/`.
 
 ## 4. The `acn.*` namespace
 
@@ -62,7 +62,7 @@ Span names follow the GenAI conventions where they exist; `acn.*` names are used
 
 ```
 manifest.json          run_id, seed, mode, backend, scenario_hash, workload_hash, hypothesis {id,status,hash},
-                       env_hash, build_hash (CON-27), semconv_version, producers[], started_at (wall, live only), replicates
+                       env_hash, build_hash (CON-27e), params (the key/value pairs of CON-27b), semconv_version, producers[], started_at (wall, live only), replicates
 spans.parquet          all spans (§6)
 events.parquet         all span events
 links.parquet          span links
@@ -71,10 +71,11 @@ views/session.parquet  derived (§7)
 views/turn.parquet
 views/call.parquet
 views/link.parquet
-verdict.json           written only by `acn hyp verdict`
 sidecar/               optional: *.mcap (replayer input), *.pcapng (netem), provider raw responses (live)
 logs/                  stderr captures, never parsed
 ```
+
+Verdicts are not part of a bundle: a verdict reads several bundles and lives under `runs/verdicts/` (HYP-20).
 
 **TRC-23** `manifest.json` MUST be written last and MUST contain `blake3` of every other file; `acn bundle verify` MUST recompute `run_id` (CON-5e) and every file hash and fail on any mismatch.
 
@@ -98,13 +99,14 @@ logs/                  stderr captures, never parsed
 
 **TRC-32** `views/turn.parquet` MUST hold one row per `acn.turn` — `session_id`, `turn_index`, `think_time_before_ns` (gap between the end of the previous turn of the session and the start of this one; null for the first turn), `chain_length` (calls in series), `fanout_width`, `duration_ns`, `first_useful_result_ns`, `outcome`, `network_wait_ns` (sum of link applied delay + rate-limit time on the turn's critical path), `tool_wait_ns`, `model_wait_ns`, `queue_wait_ns` (from TRC-18 when present), `stalls`, `retries`, `compaction`.
 
-**TRC-33** `views/call.parquet` MUST hold one row per `chat` — session/turn/call indices, provider/model, `input_tokens`, `new_input_tokens`, `output_tokens`, `stop_reason`, `preceding_tool_class` and `preceding_tool_ns` (class and duration of the `execute_tool` span that immediately precedes this call in the turn; null when there is none), `cache_read_tokens`, `cache_write_tokens`, `cached_token_ratio`, `ttft_ns`, `itl_p50_ns`, `itl_p99_ns`, `wire_bytes_up`, `wire_bytes_down`, `server_prefill_ns`, `server_decode_ns`, `retries`, `error_class`.
+**TRC-33** `views/call.parquet` MUST hold one row per `chat` — session/turn/call indices, provider/model, `input_tokens`, `new_input_tokens`, `output_tokens`, `stop_reason`, `duration_ns`, and the preceding-tool columns `preceding_tool_count`, `preceding_tool_ns` and `preceding_tool_class` (over the `execute_tool` spans of the same context lineage that ended after the previous `chat` of that lineage ended and before this one started: their number; latest end minus earliest start, which is the wait this call experienced when tools ran in parallel; and the class of the longest member, ties broken by lowest `span_id`; all null when the set is empty), `cache_read_tokens`, `cache_write_tokens`, `cached_token_ratio`, `ttft_ns`, `itl_p50_ns`, `itl_p99_ns`, `wire_bytes_up`, `wire_bytes_down`, `server_prefill_ns`, `server_decode_ns`, `retries`, `error_class`.
 
 **TRC-34** `views/link.parquet` MUST hold one row per `acn.link` — `call_id`, direction, bytes, applied delay, dropped, reordered, rate-limited time, scenario step in force, and `outage_id` when inside an outage.
 
 **TRC-35** Views MUST be recomputable from `spans.parquet` alone; `acn bundle verify --views` MUST recompute and compare them.
 
-**TRC-36** Report coverage. Every parameter of the report's Appendix C parameter sheet and every harness-side field of its §3.5 methodology MUST be mapped, in `crates/acn-trace/src/schema/report_coverage.toml`, to a view column, to a promoted `acn.*` attribute, or to an explicit `not_recorded` entry that states the reason and the side-channel that holds the data instead (for example the decode packet-size and inter-arrival distribution, held as ITL quantiles here and in full only in a `pcapng` side-channel, TRC-41). `cargo xtask docs-inventory` MUST render the mapping as `docs/generated/report-coverage.md` and MUST fail on a parameter with no entry or an entry that names a column or attribute that does not exist.
+**TRC-36** Report coverage. Appendix A of this spec enumerates, with stable keys, every harness-side field of the report's §3.5 methodology and every parameter of its Appendix C sheet, for the report version named there. `crates/acn-trace/report_coverage.toml` (outside the frozen schema module: it is documentation-grade and MUST NOT move `env_hash`) MUST map every key to exactly one of: `column` (a view and column), `attribute` (a promoted `acn.*` attribute), `derived` (an expression over named view columns, for example cached-token ratio or wire bytes per token), or `not_recorded` with the reason and the side-channel that holds the data instead (for example the decode packet-size and inter-arrival distribution, held as ITL quantiles here and in full only in a `pcapng` side-channel, TRC-41). `cargo xtask docs-inventory` MUST render the mapping as `docs/generated/report-coverage.md` and MUST fail on an Appendix A key with no entry, on an entry whose key is not in Appendix A, and on a named view, column or attribute that the machine-readable view schema of `acn-trace` does not define.
+
 
 ## 8. Side-channels
 
@@ -129,3 +131,39 @@ logs/                  stderr captures, never parsed
 1. Whether to promote `gen_ai.input.messages` (full prompt content) into the bundle at all; default no (TRC-42), revisit for POC 11 which needs prefix bytes — likely as hashes of prefix blocks, not content.
 2. Whether `acn.link` spans per message are too fine-grained for long token streams; fallback is one span per stream with per-chunk events.
 3. Adopt otel-arrow's OTAP encoding for `spans.parquet` if its Rust crates stabilise; the promoted-column design keeps that a storage-only change.
+
+## Appendix A — report fields and parameters that TRC-36 tracks (report v1.2)
+
+| Key | Report | What |
+|---|---|---|
+| `h.session_id` | §3.5 | session id |
+| `h.turn_index` | §3.5 | turn index |
+| `h.call_index` | §3.5 | call index within the turn |
+| `h.input_tokens` | §3.5 | input tokens |
+| `h.cached_input_tokens` | §3.5 | cached input tokens as returned by the API |
+| `h.output_tokens` | §3.5 | output tokens |
+| `h.stop_reason` | §3.5 | stop reason |
+| `h.ttft` | §3.5 | wall-clock time to first token |
+| `h.total_time` | §3.5 | wall-clock total time of the call |
+| `h.preceding_tool_class` | §3.5 | tool class of the preceding tool call |
+| `h.preceding_tool_time` | §3.5 | execution time of the preceding tool call |
+| `h.spawn_parent_call` | §3.5 | sub-agent spawn events with the parent call id |
+| `s.turns_per_session` | App. C | turns per session |
+| `s.think_time` | App. C | think-time between turns |
+| `s.session_lifetime` | App. C | session lifetime |
+| `t.chain_length` | App. C | chain length *k* |
+| `t.tool_exec_time_by_class` | App. C | tool execution time by class |
+| `t.fanout_degree_depth` | App. C | fan-out degree and depth |
+| `t.compaction_vs_length` | App. C | compaction probability against transcript length |
+| `c.input_length_by_call_index` | App. C | input length by call index |
+| `c.new_tokens_per_call` | App. C | new tokens per call |
+| `c.output_length_by_call_type` | App. C | output length by call type (tool call or final answer, from `stop_reason`) |
+| `c.cached_token_ratio` | App. C | cached-token ratio |
+| `b.wire_bytes_per_token` | App. C | wire bytes per token |
+| `b.decode_packet_size_interarrival` | App. C | decode packet size and inter-arrival |
+| `b.uplink_bytes_per_tool_result` | App. C | uplink bytes per tool result by class |
+| `f.diurnal_weekly` | App. C | diurnal and weekly pattern by time zone |
+| `f.cross_session_prefix_overlap` | App. C | cross-session prefix overlap |
+| `f.batch_burst_structure` | App. C | batch-job burst structure |
+
+Fleet-level keys are properties of many sessions and are expected to be `derived` or `not_recorded`; listing them keeps the omission explicit.

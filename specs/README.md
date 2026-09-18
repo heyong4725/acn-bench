@@ -10,7 +10,7 @@
 | 050 | 050-workload-generator.md | GEN | to write (T13) |
 | 060 | 060-replayer.md | RPL | to write (T50) |
 | 070 | 070-control-plane.md | CTL | to write (T14) |
-| 080 | 080-hypotheses.md | HYP | draft v0.1 (format, predicate grammar, verdicts; implemented by T05) |
+| 080 | 080-hypotheses.md | HYP | draft v0.1 (format, typed predicate grammar, slices and verdicts; implemented by T05) |
 | 085 | 085-feedback-loop.md | LOOP | draft v0.1 (layered, verifiable loop) |
 | 090 | 090-attribution.md | ATR | to write (T15) |
 | 095 | 095-gates.md | GATE | to write (T07) |

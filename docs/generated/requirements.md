@@ -2,7 +2,7 @@
 
 # Requirement inventory
 
-Specs: 4 · IDs: 97 · MUSTs: 88 · implemented: 8 · cited: 15
+Specs: 4 · IDs: 98 · MUSTs: 93 · implemented: 8 · cited: 15
 
 | ID | Spec | § | Level | Implemented | Cited by |
 |---|---|---|---|---|---|
@@ -70,26 +70,27 @@ Specs: 4 · IDs: 97 · MUSTs: 88 · implemented: 8 · cited: 15
 | HYP-2 | `080-hypotheses.md` | 2 | MUST | no | — |
 | HYP-3 | `080-hypotheses.md` | 2 | MUST | no | — |
 | HYP-4 | `080-hypotheses.md` | 2 | MUST | no | — |
-| HYP-5 | `080-hypotheses.md` | 2 | — | no | — |
+| HYP-5 | `080-hypotheses.md` | 2 | MUST | no | — |
 | HYP-6 | `080-hypotheses.md` | 2 | MUST | no | — |
 | HYP-7 | `080-hypotheses.md` | 2 | MUST | no | — |
 | HYP-8 | `080-hypotheses.md` | 2 | MUST | no | — |
 | HYP-9 | `080-hypotheses.md` | 2 | MUST | no | — |
 | HYP-10 | `080-hypotheses.md` | 3 | MUST | no | — |
-| HYP-11 | `080-hypotheses.md` | 3 | — | no | — |
+| HYP-11 | `080-hypotheses.md` | 3 | MUST | no | — |
 | HYP-12 | `080-hypotheses.md` | 3 | MUST | no | — |
-| HYP-13 | `080-hypotheses.md` | 3 | — | no | — |
+| HYP-13 | `080-hypotheses.md` | 3 | MUST | no | — |
 | HYP-14 | `080-hypotheses.md` | 3 | MUST | no | — |
 | HYP-15 | `080-hypotheses.md` | 3 | MUST | no | — |
 | HYP-16 | `080-hypotheses.md` | 3 | MUST | no | — |
 | HYP-20 | `080-hypotheses.md` | 4 | MUST | no | — |
-| HYP-21 | `080-hypotheses.md` | 4 | — | no | — |
+| HYP-21 | `080-hypotheses.md` | 4 | MUST | no | — |
 | HYP-22 | `080-hypotheses.md` | 4 | MUST | no | — |
 | HYP-23 | `080-hypotheses.md` | 4 | MUST | no | — |
 | HYP-24 | `080-hypotheses.md` | 4 | MUST | no | — |
 | HYP-25 | `080-hypotheses.md` | 4 | MUST | no | — |
 | HYP-26 | `080-hypotheses.md` | 4 | MUST | no | — |
 | HYP-27 | `080-hypotheses.md` | 4 | MUST | no | — |
+| HYP-28 | `080-hypotheses.md` | 4 | MUST | no | — |
 | LOOP-1 | `085-feedback-loop.md` | 1 | MUST | no | — |
 | LOOP-2 | `085-feedback-loop.md` | 1 | MUST | no | — |
 | LOOP-3 | `085-feedback-loop.md` | 1 | MUST | no | — |

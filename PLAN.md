@@ -28,7 +28,7 @@ The catalogue (POC 1a–16) is the current map, not the boundary. Every mileston
 
 The emulator has a `sim` mode and a `live` mode behind the same `LinkModel` and `Clock` traits.
 
-- **`sim`** — a discrete-event simulator. No sockets. Time is a virtual clock advanced by the event queue; every random draw comes from an injected seeded RNG (ChaCha20). A run is bit-identical across machines. This is the ACN simulator; it is what unit and acceptance tests run, and what an auto-research loop searches over.
+- **`sim`** — a discrete-event simulator. No sockets. Time is a virtual clock advanced by the event queue; every random draw comes from an injected seeded RNG (ChaCha20). A run is bit-identical across machines of the same target and build (CON-27e). This is the ACN simulator; it is what unit and acceptance tests run, and what an auto-research loop searches over.
 - **`live`** — the same link models applied by a userspace impairment proxy (tokio) between real sockets: the harness or generator on one side, an inference endpoint (mock or real) on the other. Wall clock, real TCP/HTTP behaviour, seeded impairment schedule. Statistically reproducible: the seed, scenario hash and environment hash are recorded in the bundle.
 - **`netem`** (Linux, feature-gated, M4) — the same scenario driven into `tc`/netem inside network namespaces, used to validate that `live` matches kernel-level impairment on the traces that matter.
 
@@ -125,7 +125,7 @@ cargo deny check                          # licenses + advisories
 
 - **Class A** — docs, tests, tools, scenarios/synthetic: baseline gates.
 - **Class B** — crates on the run path (`acn-emu`, `acn-gen`, `acn-harness`, `acn-replay`, `acn-ctl`, `acn-cli`, `acn-mockllm`): baseline gates + affected acceptance suites.
-- **Class C** — the frozen set: `hypotheses/`, `scenarios/measured/`, `crates/acn-hyp`, `crates/acn-attrib/src/core`, `crates/acn-trace/src/schema`. Human-merged PR labelled `env-change` with an updated `env-hash`, adversarial review. An auto-research loop MUST NOT have write access to the frozen set (HYP-4).
+- **Class C** — the frozen set: `hypotheses/`, `scenarios/measured/`, `crates/acn-hyp`, `crates/acn-attrib/src/core`, `crates/acn-trace/src/schema`. Human-merged PR labelled `env-change` with an updated `env-hash`, adversarial review. An auto-research loop MUST NOT have write access to the frozen set (CON-7; HYP-4 for `hypotheses/`).
 
 ## 8a. Sim ↔ live twin rule (CON-25)
 
