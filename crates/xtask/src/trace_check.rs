@@ -1,5 +1,6 @@
 //! `cargo xtask trace-check` (CON-12): every implemented MUST has a citing
-//! test, every citation names a real ID, every citation sits on a function.
+//! test, every citation names a real ID, and every citation sits on a test
+//! function in code the compiler sees. Every failure is logged as well as reported.
 
 use std::path::Path;
 
@@ -63,6 +64,12 @@ pub fn run(root: &Path) -> Result<Report> {
     }
     for c in &unknown_citations {
         tracing::error!(id = %c.id, at = %format!("{}:{}", c.file, c.line), "citation names an ID no spec defines");
+    }
+    for p in &model.problems {
+        tracing::error!(at = %format!("{}:{}", p.file, p.line), "{}", p.message);
+    }
+    for e in &model.scope_errors {
+        tracing::error!("{e}");
     }
     Ok(Report {
         ok,

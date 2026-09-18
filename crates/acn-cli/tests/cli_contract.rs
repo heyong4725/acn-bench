@@ -33,3 +33,20 @@ fn unknown_subcommand_is_a_json_error_with_exit_one() {
     assert_eq!(code, Some(1));
     assert!(json["error"].is_string());
 }
+
+/// Cites: CON-8
+#[test]
+fn help_version_and_no_arguments_keep_stdout_to_one_json_object() {
+    for args in [
+        &["--help"][..],
+        &["--version"][..],
+        &["version", "--help"][..],
+    ] {
+        let (code, json) = acn(args);
+        assert_eq!(json["ok"], true, "{args:?}");
+        assert_eq!(code, Some(0), "{args:?}");
+    }
+    let (code, json) = acn(&[]);
+    assert_eq!(json["ok"], false);
+    assert_eq!(code, Some(1));
+}

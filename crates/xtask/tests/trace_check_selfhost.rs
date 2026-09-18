@@ -155,3 +155,88 @@ fn a_root_without_specs_is_an_error_not_a_pass() {
         run.json
     );
 }
+
+/// Cites: CON-12
+#[test]
+fn files_the_compiler_never_sees_cannot_satisfy_a_requirement() {
+    // The orphan fixture cites FIX-1 three times: from a src file no `mod` line names,
+    // from a file in a tests/ subdirectory, and from the virtual workspace root's tests/.
+    // None of them is ever compiled. Only FIX-2, in a declared module, counts.
+    let run = xtask_at(&fixture("orphan"), &["trace-check"]);
+    assert!(!run.ok(), "{}", run.json);
+    assert_eq!(run.json["cited_ids"], 1, "{}", run.json);
+    assert_eq!(run.json["missing"][0]["id"], "FIX-1", "{}", run.json);
+}
+
+fn copy_dir(from: &std::path::Path, to: &std::path::Path) {
+    for entry in walkdir::WalkDir::new(from) {
+        let entry = entry.expect("walk");
+        let dest = to.join(entry.path().strip_prefix(from).expect("prefix"));
+        if entry.file_type().is_dir() {
+            std::fs::create_dir_all(&dest).expect("mkdir");
+        } else {
+            std::fs::copy(entry.path(), &dest).expect("copy");
+        }
+    }
+}
+
+/// Cites: CON-12
+#[test]
+fn losing_the_scope_file_fails_closed() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    copy_dir(&fixture("ok"), dir.path());
+    std::fs::remove_file(dir.path().join("trace-scope.toml")).expect("rm");
+    let run = xtask_at(dir.path(), &["trace-check"]);
+    assert!(!run.ok(), "{}", run.json);
+    assert!(
+        run.json["error"]
+            .as_str()
+            .expect("error")
+            .contains("trace-scope.toml"),
+        "{}",
+        run.json
+    );
+}
+
+/// Cites: CON-12
+#[test]
+fn scope_file_mistakes_fail_the_check() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    copy_dir(&fixture("ok"), dir.path());
+    std::fs::write(
+        dir.path().join("trace-scope.toml"),
+        "[[implemented]]\nspec = \"900\"\nids = [\"FIX-1\", \"FIX-42\"]\nsections = [\"7\"]\n\n[[implemented]]\nspec = \"000\"\nids = [\"FIX-2\"]\n",
+    )
+    .expect("write");
+    let run = xtask_at(dir.path(), &["trace-check"]);
+    assert!(!run.ok(), "{}", run.json);
+    // unknown ID, empty section, ID filed under the wrong spec
+    assert_eq!(strings(&run.json, "scope_errors").len(), 3, "{}", run.json);
+
+    std::fs::write(
+        dir.path().join("trace-scope.toml"),
+        "[[implemented]]\nspec = \"900\"\nidz = []\n",
+    )
+    .expect("write");
+    let run = xtask_at(dir.path(), &["trace-check"]);
+    assert!(!run.ok(), "an unknown key is rejected: {}", run.json);
+}
+
+/// Cites: CON-8
+#[test]
+fn help_version_no_arguments_and_conflicting_flags_keep_the_contract() {
+    for args in [&["--help"][..], &["trace-check", "--help"][..]] {
+        let run = common::xtask(args);
+        assert!(run.ok(), "{args:?}: {}", run.json);
+        assert!(
+            run.stderr.contains("Usage"),
+            "help goes to stderr: {}",
+            run.stderr
+        );
+    }
+    for args in [&[][..], &["env-hash", "--check", "--write"][..]] {
+        let run = common::xtask(args);
+        assert!(!run.ok(), "{args:?}: {}", run.json);
+        assert!(run.json["error"].is_string());
+    }
+}

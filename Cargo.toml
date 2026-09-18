@@ -37,6 +37,8 @@ tracing-opentelemetry = "0.31"
 zstd = "0.13"
 proptest = "1"
 walkdir = "2"
+syn = { version = "2", features = ["full", "visit"] }
+proc-macro2 = { version = "1", features = ["span-locations"] }
 tempfile = "3"
 
 [workspace.lints.rust]

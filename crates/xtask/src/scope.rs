@@ -33,11 +33,16 @@ pub struct ScopeEntry {
     pub ids: Vec<String>,
 }
 
-/// Load the scope file; a missing file is an empty scope.
+/// Load the scope file. A missing or unreadable file is an error, never an empty
+/// scope: losing the file must not switch coverage enforcement off. An empty
+/// file is the explicit way to declare that nothing is implemented yet.
 pub fn load(root: &Path) -> Result<ScopeFile> {
     let path = root.join(SCOPE_FILE);
     if !path.is_file() {
-        return Ok(ScopeFile::default());
+        return Err(Error::Invalid(format!(
+            "no {SCOPE_FILE} under {}: the scope file declares which requirements need a citing test (ADR-3)",
+            root.display()
+        )));
     }
     let text = read(&path)?;
     toml::from_str(&text).map_err(|e| Error::Toml { path, source: e })

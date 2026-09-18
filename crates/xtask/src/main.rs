@@ -79,7 +79,15 @@ fn run() -> Value {
 fn main() {
     logging::init();
     let out = run();
-    println!("{out}");
     let ok = out.get("ok").and_then(Value::as_bool) == Some(true);
-    std::process::exit(if ok { 0 } else { 1 });
+    // CON-8: the JSON object is the result. If it cannot be written (a closed pipe),
+    // the run has not succeeded, and `println!` would panic instead of saying so.
+    let written = {
+        use std::io::Write as _;
+        let mut stdout = std::io::stdout().lock();
+        writeln!(stdout, "{out}")
+            .and_then(|()| stdout.flush())
+            .is_ok()
+    };
+    std::process::exit(if ok && written { 0 } else { 1 });
 }
