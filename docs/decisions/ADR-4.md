@@ -12,3 +12,6 @@ CON-7 requires an `env-change` PR to carry "the updated output of `cargo xtask e
 
 ## Consequences
 A change to any frozen file fails `env-hash --check` until the record is rewritten in the same PR, which is the mechanical hook for the `env-change` process. Adding a file to a frozen directory also moves the hash. Run-time consumers (`acn-cli`, T02+) read `env-hash.json` rather than recomputing, so a bundle's `env_hash` is the value that was reviewed.
+
+## Amendment 1 — the build is hashed separately (CON-27e)
+The decision above keeps the toolchain pin and `Cargo.lock` out of `env_hash`. That left a hole: a bump of Arrow, Parquet, zstd or the compiler changes a bundle's bytes while `env_hash` and `run_id` stay the same, so the byte-identity claim of CON-5(c) was not backed by any recorded value. Constitution v0.2 closes it with `build_hash` (CON-27e), carried in every manifest and deliberately not an input of `run_id`. `env_hash` keeps its meaning: the frozen set that defines the *question*. `build_hash` names the *binary* that answered it.

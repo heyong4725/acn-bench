@@ -2,7 +2,7 @@
 
 # Requirement inventory
 
-Specs: 3 · IDs: 71 · MUSTs: 50 · implemented: 9 · cited: 15
+Specs: 4 · IDs: 97 · MUSTs: 88 · implemented: 9 · cited: 15
 
 | ID | Spec | § | Level | Implemented | Cited by |
 |---|---|---|---|---|---|
@@ -11,11 +11,12 @@ Specs: 3 · IDs: 71 · MUSTs: 50 · implemented: 9 · cited: 15
 | CON-3 | `000-constitution.md` | 1 | MUST | no | — |
 | CON-4 | `000-constitution.md` | 1 | MUST | no | — |
 | CON-5 | `000-constitution.md` | 2 | MUST | no | `crates/xtask/tests/workspace.rs` `clippy_disallows_ambient_time_and_randomness`<br>`crates/xtask/tests/workspace.rs` `clippy_bans_every_ambient_entropy_and_clock_source_and_unordered_maps` |
-| CON-6 | `000-constitution.md` | 2 | MAY | yes | `crates/xtask/tests/workspace.rs` `layout_matches_the_constitution`<br>`crates/xtask/tests/workspace.rs` `workspace_members_are_exactly_the_layout` |
+| CON-6 | `000-constitution.md` | 2 | MUST | yes | `crates/xtask/tests/workspace.rs` `layout_matches_the_constitution`<br>`crates/xtask/tests/workspace.rs` `workspace_members_are_exactly_the_layout` |
 | CON-7 | `000-constitution.md` | 2 | MUST | yes | `crates/xtask/tests/env_hash.rs` `hash_covers_exactly_the_frozen_set`<br>`crates/xtask/tests/env_hash.rs` `hash_is_deterministic_and_hex_blake3`<br>`crates/xtask/tests/env_hash.rs` `hash_changes_only_when_a_frozen_file_changes`<br>`crates/xtask/tests/env_hash.rs` `check_fails_without_a_record_and_passes_after_write`<br>`crates/xtask/tests/env_hash.rs` `self_host_the_recorded_hash_matches_the_workspace`<br>`crates/xtask/tests/env_hash.rs` `symlinks_inside_the_frozen_set_are_refused`<br>`crates/xtask/tests/env_hash.rs` `check_failure_reports_the_per_file_diff_and_a_hint`<br>`crates/xtask/tests/pr_check.rs` `a_frozen_set_edit_needs_env_change_once_m0_is_closed`<br>`crates/xtask/tests/pr_check.rs` `ordinary_changes_need_no_label`<br>`crates/xtask/tests/workspace.rs` `ci_runs_pr_check_with_the_labels_and_reruns_when_labels_change` |
+| CON-27 | `000-constitution.md` | 2 | MUST | no | — |
 | CON-8 | `000-constitution.md` | 3 | MUST | yes | `crates/acn-cli/tests/cli_contract.rs` `version_prints_one_json_object_and_exits_zero`<br>`crates/acn-cli/tests/cli_contract.rs` `unknown_subcommand_is_a_json_error_with_exit_one`<br>`crates/xtask/tests/env_hash.rs` `env_hash_honours_the_json_contract_on_both_outcomes`<br>`crates/xtask/tests/pr_check.rs` `pr_check_base_mode_reads_the_diff_from_git`<br>`crates/xtask/tests/trace_check_selfhost.rs` `trace_check_emits_one_json_object_and_exit_code_tracks_ok`<br>`crates/xtask/tests/trace_check_selfhost.rs` `argument_errors_still_honour_the_json_contract` |
-| CON-9 | `000-constitution.md` | 3 | MAY | yes | `crates/xtask/tests/docs_inventory.rs` `check_fails_until_generated_docs_are_written_then_passes`<br>`crates/xtask/tests/docs_inventory.rs` `generation_is_deterministic`<br>`crates/xtask/tests/docs_inventory.rs` `self_host_generated_docs_are_current`<br>`crates/xtask/tests/workspace.rs` `ci_script_chains_the_gates_in_order` |
-| CON-10 | `000-constitution.md` | 3 | — | no | — |
+| CON-9 | `000-constitution.md` | 3 | MUST | yes | `crates/xtask/tests/docs_inventory.rs` `check_fails_until_generated_docs_are_written_then_passes`<br>`crates/xtask/tests/docs_inventory.rs` `generation_is_deterministic`<br>`crates/xtask/tests/docs_inventory.rs` `self_host_generated_docs_are_current`<br>`crates/xtask/tests/workspace.rs` `ci_script_chains_the_gates_in_order` |
+| CON-10 | `000-constitution.md` | 3 | MUST | no | — |
 | CON-11 | `000-constitution.md` | 3 | MUST | no | `crates/xtask/tests/workspace.rs` `the_pr_template_asks_for_requirement_ids_class_and_labels` |
 | CON-12 | `000-constitution.md` | 4 | MUST | yes | `crates/xtask/tests/trace_check_selfhost.rs` `passes_when_every_implemented_must_is_cited`<br>`crates/xtask/tests/trace_check_selfhost.rs` `fails_on_an_uncited_must_in_an_implemented_section`<br>`crates/xtask/tests/trace_check_selfhost.rs` `fails_on_a_citation_of_a_nonexistent_id`<br>`crates/xtask/tests/trace_check_selfhost.rs` `fails_when_a_citation_is_not_attached_to_a_function`<br>`crates/xtask/tests/trace_check_selfhost.rs` `ids_inside_code_fences_are_not_requirements`<br>`crates/xtask/tests/trace_check_selfhost.rs` `self_host_the_real_workspace_passes`<br>`crates/xtask/tests/trace_check_selfhost.rs` `fails_when_a_citation_is_on_a_non_test_function`<br>`crates/xtask/tests/trace_check_selfhost.rs` `accepts_continuations_and_attribute_placements`<br>`crates/xtask/tests/trace_check_selfhost.rs` `a_root_without_specs_is_an_error_not_a_pass`<br>`crates/xtask/tests/trace_check_selfhost.rs` `an_in_scope_id_needs_a_citation_even_without_an_rfc_keyword`<br>`crates/xtask/tests/trace_check_selfhost.rs` `dangling_id_references_in_docs_and_hypotheses_fail`<br>`crates/xtask/tests/trace_check_selfhost.rs` `references_to_indexed_but_unwritten_specs_are_forward_not_dangling`<br>`crates/xtask/tests/workspace.rs` `ci_has_a_nightly_trigger_for_the_nightly_tiers` |
 | CON-13 | `000-constitution.md` | 4 | MUST | no | `crates/xtask/tests/workspace.rs` `a_spec_conflict_issue_template_exists_with_the_mandated_title` |
@@ -36,19 +37,19 @@ Specs: 3 · IDs: 71 · MUSTs: 50 · implemented: 9 · cited: 15
 | TRC-2 | `010-trace-schema.md` | 2 | MUST | no | — |
 | TRC-3 | `010-trace-schema.md` | 2 | MUST | no | — |
 | TRC-4 | `010-trace-schema.md` | 2 | MUST | no | — |
-| TRC-10 | `010-trace-schema.md` | 3 | — | no | — |
-| TRC-11 | `010-trace-schema.md` | 3 | — | no | — |
-| TRC-12 | `010-trace-schema.md` | 3 | — | no | — |
-| TRC-13 | `010-trace-schema.md` | 3 | — | no | — |
-| TRC-14 | `010-trace-schema.md` | 3 | — | no | — |
-| TRC-15 | `010-trace-schema.md` | 3 | — | no | — |
-| TRC-16 | `010-trace-schema.md` | 3 | — | no | — |
-| TRC-17 | `010-trace-schema.md` | 3 | — | no | — |
+| TRC-10 | `010-trace-schema.md` | 3 | MUST | no | — |
+| TRC-11 | `010-trace-schema.md` | 3 | MUST | no | — |
+| TRC-12 | `010-trace-schema.md` | 3 | MUST | no | — |
+| TRC-13 | `010-trace-schema.md` | 3 | MUST | no | — |
+| TRC-14 | `010-trace-schema.md` | 3 | MUST | no | — |
+| TRC-15 | `010-trace-schema.md` | 3 | MUST | no | — |
+| TRC-16 | `010-trace-schema.md` | 3 | MUST | no | — |
+| TRC-17 | `010-trace-schema.md` | 3 | MUST | no | — |
 | TRC-18 | `010-trace-schema.md` | 3 | MUST | no | — |
 | TRC-19 | `010-trace-schema.md` | 3 | MUST | no | — |
 | TRC-20 | `010-trace-schema.md` | 4 | MUST | no | — |
 | TRC-21 | `010-trace-schema.md` | 4 | MUST | no | — |
-| TRC-22 | `010-trace-schema.md` | 5 | — | no | — |
+| TRC-22 | `010-trace-schema.md` | 5 | MUST | no | — |
 | TRC-23 | `010-trace-schema.md` | 5 | MUST | no | — |
 | TRC-24 | `010-trace-schema.md` | 5 | MUST | no | — |
 | TRC-25 | `010-trace-schema.md` | 6 | MUST | no | — |
@@ -56,14 +57,39 @@ Specs: 3 · IDs: 71 · MUSTs: 50 · implemented: 9 · cited: 15
 | TRC-27 | `010-trace-schema.md` | 6 | MUST | no | — |
 | TRC-28 | `010-trace-schema.md` | 6 | MUST | no | — |
 | TRC-30 | `010-trace-schema.md` | 7 | MUST | no | — |
-| TRC-31 | `010-trace-schema.md` | 7 | — | no | — |
-| TRC-32 | `010-trace-schema.md` | 7 | — | no | — |
-| TRC-33 | `010-trace-schema.md` | 7 | — | no | — |
-| TRC-34 | `010-trace-schema.md` | 7 | — | no | — |
+| TRC-31 | `010-trace-schema.md` | 7 | MUST | no | — |
+| TRC-32 | `010-trace-schema.md` | 7 | MUST | no | — |
+| TRC-33 | `010-trace-schema.md` | 7 | MUST | no | — |
+| TRC-34 | `010-trace-schema.md` | 7 | MUST | no | — |
 | TRC-35 | `010-trace-schema.md` | 7 | MUST | no | — |
+| TRC-36 | `010-trace-schema.md` | 7 | MUST | no | — |
 | TRC-40 | `010-trace-schema.md` | 8 | MUST | no | — |
 | TRC-41 | `010-trace-schema.md` | 8 | MUST | no | — |
 | TRC-42 | `010-trace-schema.md` | 8 | MUST | no | — |
+| HYP-1 | `080-hypotheses.md` | 2 | MUST | no | — |
+| HYP-2 | `080-hypotheses.md` | 2 | MUST | no | — |
+| HYP-3 | `080-hypotheses.md` | 2 | MUST | no | — |
+| HYP-4 | `080-hypotheses.md` | 2 | MUST | no | — |
+| HYP-5 | `080-hypotheses.md` | 2 | — | no | — |
+| HYP-6 | `080-hypotheses.md` | 2 | MUST | no | — |
+| HYP-7 | `080-hypotheses.md` | 2 | MUST | no | — |
+| HYP-8 | `080-hypotheses.md` | 2 | MUST | no | — |
+| HYP-9 | `080-hypotheses.md` | 2 | MUST | no | — |
+| HYP-10 | `080-hypotheses.md` | 3 | MUST | no | — |
+| HYP-11 | `080-hypotheses.md` | 3 | — | no | — |
+| HYP-12 | `080-hypotheses.md` | 3 | MUST | no | — |
+| HYP-13 | `080-hypotheses.md` | 3 | — | no | — |
+| HYP-14 | `080-hypotheses.md` | 3 | MUST | no | — |
+| HYP-15 | `080-hypotheses.md` | 3 | MUST | no | — |
+| HYP-16 | `080-hypotheses.md` | 3 | MUST | no | — |
+| HYP-20 | `080-hypotheses.md` | 4 | MUST | no | — |
+| HYP-21 | `080-hypotheses.md` | 4 | — | no | — |
+| HYP-22 | `080-hypotheses.md` | 4 | MUST | no | — |
+| HYP-23 | `080-hypotheses.md` | 4 | MUST | no | — |
+| HYP-24 | `080-hypotheses.md` | 4 | MUST | no | — |
+| HYP-25 | `080-hypotheses.md` | 4 | MUST | no | — |
+| HYP-26 | `080-hypotheses.md` | 4 | MUST | no | — |
+| HYP-27 | `080-hypotheses.md` | 4 | MUST | no | — |
 | LOOP-1 | `085-feedback-loop.md` | 1 | MUST | no | — |
 | LOOP-2 | `085-feedback-loop.md` | 1 | MUST | no | — |
 | LOOP-3 | `085-feedback-loop.md` | 1 | MUST | no | — |
