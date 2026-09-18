@@ -89,6 +89,37 @@ fn fence(line: &str) -> Option<(char, usize)> {
     (n >= 3).then_some((c, n))
 }
 
+/// Fence state for a Markdown file, shared by the spec parser and the reference
+/// scanner so that both agree on which lines are example text.
+#[derive(Debug, Default)]
+pub(crate) struct Fences {
+    /// (fence character, opening run length, opening line)
+    open: Option<(char, usize, usize)>,
+}
+
+impl Fences {
+    /// Whether `line` is a fence delimiter or lies inside a fence. A fence closes
+    /// only on the same character, at least as long, with nothing after it.
+    pub(crate) fn hides(&mut self, line: &str, line_no: usize) -> bool {
+        if let Some((c, n)) = fence(line) {
+            match self.open {
+                None => self.open = Some((c, n, line_no)),
+                Some((oc, on, _)) if c == oc && n >= on && line.trim().chars().all(|x| x == c) => {
+                    self.open = None;
+                }
+                Some(_) => {}
+            }
+            return true;
+        }
+        self.open.is_some()
+    }
+
+    /// The line on which a still-open fence started.
+    pub(crate) fn unclosed(&self) -> Option<usize> {
+        self.open.map(|(_, _, line)| line)
+    }
+}
+
 /// The bold ID that starts a requirement paragraph, optionally behind a list marker.
 fn leading_id(line: &str) -> Option<&str> {
     let t = line.trim_start();
@@ -108,22 +139,10 @@ pub fn parse_spec_text(file: &str, spec: &str, text: &str) -> Result<Vec<Require
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     let lines: Vec<&str> = text.lines().collect();
     let mut out = Vec::new();
-    // (fence character, opening run length, opening line)
-    let mut open: Option<(char, usize, usize)> = None;
+    let mut fences = Fences::default();
     let mut section: Option<String> = None;
     for (i, line) in lines.iter().enumerate() {
-        if let Some((c, n)) = fence(line) {
-            match open {
-                None => open = Some((c, n, i + 1)),
-                // A fence closes only on the same character, at least as long, with nothing after it.
-                Some((oc, on, _)) if c == oc && n >= on && line.trim().chars().all(|x| x == c) => {
-                    open = None;
-                }
-                Some(_) => {}
-            }
-            continue;
-        }
-        if open.is_some() {
+        if fences.hides(line, i + 1) {
             continue;
         }
         let t = line.trim_start();
@@ -153,7 +172,7 @@ pub fn parse_spec_text(file: &str, spec: &str, text: &str) -> Result<Vec<Require
             level: level_of(&paragraph),
         });
     }
-    if let Some((_, _, line)) = open {
+    if let Some(line) = fences.unclosed() {
         return Err(Error::Invalid(format!(
             "specs/{file}:{line}: code fence is never closed, which would hide every requirement after it"
         )));
