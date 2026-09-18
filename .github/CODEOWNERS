@@ -7,3 +7,8 @@
 /specs/                          @heyong4725
 /env-hash.json                   @heyong4725
 /trace-scope.toml                @heyong4725
+/.github/workflows/              @heyong4725
+/clippy.toml                     @heyong4725
+/deny.toml                       @heyong4725
+/rust-toolchain.toml             @heyong4725
+/tools/ci.sh                     @heyong4725

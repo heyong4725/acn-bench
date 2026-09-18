@@ -19,6 +19,15 @@ deny = [
   { crate = "r2r", reason = "CON-20" },
   { crate = "rosrust", reason = "CON-20" },
   { crate = "ros2-client", reason = "CON-20" },
+  { crate = "roslibrust", reason = "CON-20" },
+  { crate = "safe_drive", reason = "CON-20" },
+  { crate = "dora-message", reason = "CON-20" },
+  { crate = "dora-coordinator", reason = "CON-20" },
+  { crate = "dora-cli", reason = "CON-20" },
+  { crate = "dora-ros2-bridge", reason = "CON-20" },
+  { crate = "dora-arrow-convert", reason = "CON-20" },
+  { crate = "aisle", reason = "CON-20" },
+  { crate = "genesis", reason = "CON-20" },
 ]
 
 [sources]
