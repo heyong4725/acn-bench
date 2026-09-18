@@ -69,7 +69,7 @@ cargo fmt --all --check \
 
 ## Lab track (CON-23, CON-24)
 
-- Put spikes, throwaway simulators, partner-stack wrappers and candidate hypotheses under `lab/<slug>/`. Depend on whatever you need.
+- Put spikes, throwaway simulators, partner-stack wrappers and candidate hypotheses under `lab/<slug>/`. Create a crate with `cp -R lab/_template lab/<slug>`, never with `cargo new` (it edits the root manifest; ADR-7). Depend on whatever you need.
 - Gates, per lab crate (lab/ is excluded from the workspace, so address the crate by manifest): `cargo fmt --manifest-path lab/<slug>/Cargo.toml --check && cargo clippy --manifest-path lab/<slug>/Cargo.toml --all-targets -- -D warnings`. `lab/clippy.toml` switches off the substrate's determinism bans. No trace-check, no citing, no control.
 - Write `docs/lab/<yyyy-mm-dd>-<slug>.md`: question, what was tried, what was learned (numbers welcome, labelled exploratory), graduate / park / drop.
 - To graduate: open a `spec-change` PR with the spec and IDs, promote the candidate hypothesis file, then follow the substrate loop. New POCs beyond the catalogue are expected to come from here.
