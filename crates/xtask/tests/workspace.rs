@@ -516,16 +516,23 @@ fn pr_check_workflow_passes_labels_and_base_and_reruns_on_label_changes() {
     let wf = workflow(".github/workflows/pr-check.yml");
     assert_eq!(events(&wf), ["pull_request"]);
     let types = inline_list(&wf, "types:");
-    for t in ["opened", "synchronize", "reopened", "labeled", "unlabeled"] {
+    for t in [
+        "opened",
+        "synchronize",
+        "reopened",
+        "edited",
+        "labeled",
+        "unlabeled",
+    ] {
         assert!(
             types.iter().any(|x| x == t),
             "pull_request types must include `{t}`: {types:?}"
         );
     }
     assert!(
-        wf.iter().any(
-            |l| l.trim() == "LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}"
-        ),
+        wf.iter()
+            .any(|l| l.trim()
+                == "LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}"),
         "labels must come from the event, through env (no script injection)"
     );
     assert!(
@@ -534,7 +541,7 @@ fn pr_check_workflow_passes_labels_and_base_and_reruns_on_label_changes() {
     );
     assert!(
         wf.iter().any(|l| l.trim()
-            == "run: cargo xtask pr-check --base \"origin/${BASE_REF}\" --labels \"${LABELS}\""),
+            == "run: cargo xtask pr-check --base \"refs/remotes/origin/${BASE_REF}\" --labels-json \"${LABELS_JSON}\""),
         "pr-check must receive the base and the labels"
     );
     assert!(
