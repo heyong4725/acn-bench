@@ -7,7 +7,7 @@
 | [ADR-1](../decisions/ADR-1.md) | Userspace impairment proxy as the primary `live` backend | accepted (draft v0.1) | CON-1, EMU (SPEC 020, to write) |
 | [ADR-2](../decisions/ADR-2.md) | OpenTelemetry as the event model; acn-bench owns the Parquet writer | accepted (draft v0.1) | CON-4, CON-5, TRC-1..4, TRC-20, TRC-25, TRC-27 |
 | [ADR-3](../decisions/ADR-3.md) | What `trace-check` counts as implemented, and how citations are parsed | accepted (T01) | CON-12, CON-23 |
-| [ADR-4](../decisions/ADR-4.md) | `env-hash` covers exactly the frozen set and is recorded at the root | accepted (T01) | CON-5(e), CON-7, CON-9 |
+| [ADR-4](../decisions/ADR-4.md) | ADR-4 | — | — |
 | [ADR-5](../decisions/ADR-5.md) | T01 scaffolds every CON-6 crate as a stub; CLI argument errors stay inside the JSON contract | accepted (T01) | CON-6, CON-8, CON-19 |
 | [ADR-6](../decisions/ADR-6.md) | `cargo xtask pr-check`: label rules and CODEOWNERS coverage as machine checks | accepted (xtask hardening) | CON-7, CON-14, LOOP-20 |
 | [ADR-7](../decisions/ADR-7.md) | `lab/` is outside the Cargo workspace and outside the determinism lints | accepted (foundation CI/lab) | CON-2, CON-6, CON-23 |
