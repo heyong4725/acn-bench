@@ -313,6 +313,17 @@ fn codeowners_coverage_follows_last_match_wins_and_needs_a_real_owner() {
         ("a later catch-all", "* @bot\n"),
         ("a later narrower pattern", "/specs/*.md @bot\n"),
         ("a later parent pattern", "/crates/ @bot\n"),
+        ("a glob inside a path component", "/spec* @bot\n"),
+        ("a single-character glob", "/docs/gat?s/ @bot\n"),
+        (
+            "a bare file name, which matches at any depth",
+            "p4.toml @bot\n",
+        ),
+        (
+            "a bare directory name, which matches at any depth",
+            "core/ @bot\n",
+        ),
+        ("a bare at-sign is not an owner", "/specs/ @\n"),
     ] {
         let dir = root_with(&format!("{FULL_CODEOWNERS}{extra}"), false);
         let run = xtask_at(dir.path(), &["pr-check"]);

@@ -72,18 +72,38 @@ fn normalise_pattern(pattern: &str) -> String {
         .to_owned()
 }
 
-/// Whether a CODEOWNERS pattern could decide ownership of files under `protected`
-/// (both normalised). Conservative: globs, parents and children all count.
-fn overlaps(pattern: &str, protected: &str) -> bool {
+/// Whether a CODEOWNERS pattern, as written, could decide ownership of files
+/// under `protected` (normalised). Deliberately an over-approximation of
+/// gitignore matching, so the check fails closed:
+/// - an unanchored pattern (`mod.rs`, `core/`, `*.md`) can match at any depth, so it overlaps everything;
+/// - an anchored glob overlaps when its literal prefix and the protected path share a string prefix
+///   (`/spec*` vs `specs`, `/docs/gat?s/` vs `docs/gates`);
+/// - an anchored literal overlaps when it is the path, a parent of it, or inside it.
+fn overlaps(raw: &str, protected: &str) -> bool {
+    let anchored = raw.starts_with('/') || raw.trim_end_matches('/').contains('/');
+    if !anchored {
+        return true;
+    }
+    let pattern = normalise_pattern(raw);
+    let is_glob = pattern.contains(['*', '?', '[']);
     let literal: String = pattern
         .chars()
-        .take_while(|c| *c != '*' && *c != '?' && *c != '[')
+        .take_while(|c| !matches!(c, '*' | '?' | '['))
         .collect();
-    let literal = literal.trim_end_matches('/');
-    literal.is_empty()
-        || literal == protected
+    if is_glob {
+        return protected.starts_with(&literal) || literal.starts_with(&format!("{protected}/"));
+    }
+    literal == protected
         || protected.starts_with(&format!("{literal}/"))
         || literal.starts_with(&format!("{protected}/"))
+}
+
+fn is_owner(token: &str) -> bool {
+    match token.split_once('@') {
+        Some(("", handle)) => !handle.is_empty(),
+        Some((local, domain)) => !local.is_empty() && domain.contains('.'),
+        None => false,
+    }
 }
 
 /// Protected patterns whose *last* overlapping CODEOWNERS entry is not an exact,
@@ -95,15 +115,15 @@ pub fn codeowners_missing(root: &Path) -> Result<Vec<String>> {
     } else {
         String::new()
     };
-    // (pattern, has a real owner)
+    // (pattern as written, has a real owner)
     let entries: Vec<(String, bool)> = text
         .lines()
         .map(|l| l.split_once('#').map_or(l, |(code, _)| code).trim())
         .filter(|l| !l.is_empty())
         .filter_map(|l| {
             let mut parts = l.split_whitespace();
-            let pattern = normalise_pattern(parts.next()?);
-            let owned = parts.any(|o| o.starts_with('@') || (o.contains('@') && o.contains('.')));
+            let pattern = parts.next()?.to_owned();
+            let owned = parts.any(is_owner);
             Some((pattern, owned))
         })
         .collect();
@@ -114,8 +134,10 @@ pub fn codeowners_missing(root: &Path) -> Result<Vec<String>> {
             let last = entries
                 .iter()
                 .rev()
-                .find(|(pat, _)| overlaps(pat, &protected));
-            !matches!(last, Some((pat, true)) if *pat == protected)
+                .find(|(raw, _)| overlaps(raw, &protected));
+            // Protected only if the last entry that could match is the exact,
+            // anchored path with a real owner.
+            !matches!(last, Some((raw, true)) if raw.starts_with('/') && normalise_pattern(raw) == protected)
         })
         .collect())
 }
@@ -323,9 +345,18 @@ mod tests {
     #[test]
     fn overlap() {
         assert!(overlaps("*", "specs"));
-        assert!(overlaps("specs/*.md", "specs"));
-        assert!(overlaps("crates", "crates/acn-hyp"));
-        assert!(!overlaps("crates/acn-emu", "crates/acn-hyp"));
-        assert!(!overlaps("specs-old", "specs"));
+        assert!(overlaps("/specs/*.md", "specs"));
+        assert!(overlaps("/crates/", "crates/acn-hyp"));
+        assert!(!overlaps("/crates/acn-emu/", "crates/acn-hyp"));
+        assert!(!overlaps("/specs-old/", "specs"));
+        // Globs inside a component, and unanchored names, fail closed.
+        assert!(overlaps("/spec*", "specs"));
+        assert!(overlaps("/docs/gat?s/", "docs/gates"));
+        assert!(overlaps("/.git*/CODEOWNERS", ".github/CODEOWNERS"));
+        assert!(overlaps("mod.rs", "crates/acn-attrib/src/core"));
+        assert!(overlaps("core/", "crates/acn-attrib/src/core"));
+        assert!(!overlaps("/spec-notes*", "specs"));
+        assert!(is_owner("@user") && is_owner("@org/team") && is_owner("a@b.io"));
+        assert!(!is_owner("@") && !is_owner("#") && !is_owner("TODO"));
     }
 }

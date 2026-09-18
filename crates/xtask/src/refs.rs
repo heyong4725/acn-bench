@@ -1,6 +1,6 @@
 //! Requirement-ID references outside Rust sources (ADR-3, amendment 2).
 //!
-//! Markdown at the root, under `docs/` and under `specs/`, and hypothesis files
+//! Markdown at the root, under `docs/`, `specs/` and `.github/`, and hypothesis files
 //! under `hypotheses/`, are scanned for `PREFIX-n` tokens. A token whose prefix
 //! belongs to a written spec must name a defined ID; a token whose prefix is
 //! only listed in `specs/README.md` (a spec still to write) is a forward
@@ -127,7 +127,12 @@ fn scanned_files(root: &Path) -> Result<Vec<std::path::PathBuf>> {
                 .filter(|p| p.is_file() && p.extension().is_some_and(|x| x == "md")),
         );
     }
-    for (base, ext) in [("docs", "md"), ("specs", "md"), ("hypotheses", "toml")] {
+    for (base, ext) in [
+        ("docs", "md"),
+        ("specs", "md"),
+        (".github", "md"),
+        ("hypotheses", "toml"),
+    ] {
         let dir = root.join(base);
         if !dir.is_dir() {
             continue;
@@ -138,6 +143,7 @@ fn scanned_files(root: &Path) -> Result<Vec<std::path::PathBuf>> {
             .filter_entry(|e| {
                 let name = e.file_name().to_str().unwrap_or("");
                 !(e.file_type().is_dir()
+                    && e.depth() > 0
                     && (name == "generated" || name == "lab" || name.starts_with('.')))
             });
         for entry in walker {

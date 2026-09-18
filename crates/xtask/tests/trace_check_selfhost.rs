@@ -183,7 +183,7 @@ fn dangling_id_references_in_docs_and_hypotheses_fail() {
     // FIX-77 (PLAN.md), FIX-88 (ADR), FIX-66 (hypothesis comment); generated docs, lab notes and lab/ are not scanned.
     assert_eq!(
         ids_of(&run.json, "dangling_references"),
-        vec!["FIX-44", "FIX-55", "FIX-66", "FIX-77", "FIX-88"],
+        vec!["FIX-33", "FIX-44", "FIX-55", "FIX-66", "FIX-77", "FIX-88"],
         "{}",
         run.json
     );
