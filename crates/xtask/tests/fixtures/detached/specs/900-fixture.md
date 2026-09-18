@@ -6,7 +6,7 @@
 
 **FIX-1** A fixture requirement MUST be cited by a test when its section is implemented.
 
-**FIX-2** A fixture MAY carry clauses that are not MUSTs; these never require a citation.
+**FIX-2** A fixture MAY carry optional clauses.
 
 ## 2. Unimplemented section
 

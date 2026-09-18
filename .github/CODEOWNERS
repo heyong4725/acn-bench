@@ -7,3 +7,5 @@
 /specs/                          @heyong4725
 /env-hash.json                   @heyong4725
 /trace-scope.toml                @heyong4725
+/docs/gates/                     @heyong4725
+/.github/CODEOWNERS              @heyong4725
