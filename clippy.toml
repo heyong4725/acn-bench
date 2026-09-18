@@ -21,6 +21,9 @@ disallowed-methods = [
   { path = "getrandom::fill", reason = "CON-5: use the injected ChaCha20Rng", allow-invalid = true },
   { path = "getrandom::getrandom", reason = "CON-5: use the injected ChaCha20Rng", allow-invalid = true },
   { path = "std::time::SystemTime::elapsed", reason = "CON-5: reads the wall clock; use the injected Clock" },
+  { path = "std::time::Instant::elapsed", reason = "CON-5: reads the monotonic clock; use the injected Clock" },
+  { path = "getrandom::u32", reason = "CON-5: use the injected ChaCha20Rng", allow-invalid = true },
+  { path = "getrandom::u64", reason = "CON-5: use the injected ChaCha20Rng", allow-invalid = true },
   { path = "ahash::RandomState::new", reason = "CON-5: per-process random hasher seeds break byte-identical output" },
   { path = "uuid::Uuid::new_v4", reason = "CON-5: derive identifiers from the run seed (TRC-27)" },
   { path = "std::collections::hash_map::RandomState::new", reason = "CON-5: per-process random hasher seeds break byte-identical output" },
@@ -34,6 +37,7 @@ disallowed-types = [
   { path = "hashbrown::HashSet", reason = "CON-5(c): iteration order is random; use BTreeSet" },
   { path = "ahash::AHashMap", reason = "CON-5(c): iteration order is random; use BTreeMap" },
   { path = "ahash::AHashSet", reason = "CON-5(c): iteration order is random; use BTreeSet" },
+  { path = "std::hash::RandomState", reason = "CON-5: a per-process random hasher seed, however it is constructed" },
   { path = "rand::rngs::OsRng", reason = "CON-5: use the injected ChaCha20Rng" },
   { path = "rand::rngs::ThreadRng", reason = "CON-5: use the injected ChaCha20Rng" },
 ]

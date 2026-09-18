@@ -3,5 +3,4 @@ target/
 *.log
 
 .env
-target/
 .claude/

@@ -13,3 +13,6 @@ CON-23 lets lab crates depend on anything and exempts them from CON-4..18. As sh
 
 ## Consequences
 A lab crate cannot use `workspace = true` inheritance; it states its own edition and dependency versions, which also keeps exploratory dependencies out of the reproducibility story. Graduation (CON-24) moves code into `crates/` under a `spec-change` PR, at which point the full lint posture applies.
+
+## Amendment (pre-landing review) — the boundary holds in both directions
+`exclude = ["lab"]` keeps lab crates out of the workspace, but nothing stopped a substrate crate from naming one as a path dependency. That compiles lab code into the substrate with no lint (clippy checks workspace members only, and `lab/clippy.toml` shields the path), puts its dependencies in the substrate lockfile, and shows no source to `cargo deny`. A test now requires that every package in `Cargo.lock` without a `source` is a workspace member, which also catches a vendored copy and a `[patch]` to a path; the root manifest may contain `[workspace]` only. The template carries `#![forbid(unsafe_code)]`, because CON-23 lifts CON-4 to CON-18 and CON-19 is not among them. The test for the empty `[workspace]` table copies the template into an unrelated workspace, so it proves the table and not the root `exclude`.

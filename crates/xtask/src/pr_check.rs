@@ -74,11 +74,30 @@ pub enum Changes {
 
 // ---------------------------------------------------------------- CODEOWNERS
 
-/// Paths CODEOWNERS must cover: the frozen set, the specs, the gate records,
-/// the two records the gates read, and CODEOWNERS itself. These strings are the
-/// exact entries the file must contain.
+/// Enforcement points: files that decide what the gates check or how they run.
+/// A change to one of them can switch a gate off without touching a protected
+/// path, so CODEOWNERS must name each (ADR-6, amendment 2). The manifest and the
+/// lockfile are here because they choose the code the checker is built from.
+pub const ENFORCEMENT_POINTS: &[&str] = &[
+    "/.github/workflows/",
+    "/.github/dependabot.yml",
+    "/.cargo/",
+    "/Cargo.toml",
+    "/Cargo.lock",
+    "/clippy.toml",
+    "/deny.toml",
+    "/rust-toolchain.toml",
+    "/tools/ci.sh",
+    "/crates/xtask/",
+    "/lab/clippy.toml",
+];
+
+/// Paths CODEOWNERS must cover: the enforcement points, the frozen set, the
+/// specs, the gate records, the two records the gates read, and CODEOWNERS
+/// itself. These strings are the exact entries the file must contain.
 pub fn protected_patterns() -> Vec<String> {
-    let mut v: Vec<String> = FROZEN_SET.iter().map(|p| format!("/{p}/")).collect();
+    let mut v: Vec<String> = ENFORCEMENT_POINTS.iter().map(|p| (*p).to_owned()).collect();
+    v.extend(FROZEN_SET.iter().map(|p| format!("/{p}/")));
     v.push(format!("/{SPECS_DIR}/"));
     v.push(format!("/{RECORD_FILE}"));
     v.push(format!("/{SCOPE_FILE}"));
