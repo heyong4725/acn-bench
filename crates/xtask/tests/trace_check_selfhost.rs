@@ -183,15 +183,29 @@ fn dangling_id_references_in_docs_and_hypotheses_fail() {
     // FIX-77 (PLAN.md), FIX-88 (ADR), FIX-66 (hypothesis comment); generated docs, lab notes and lab/ are not scanned.
     assert_eq!(
         ids_of(&run.json, "dangling_references"),
-        vec!["FIX-66", "FIX-77", "FIX-88"],
+        vec!["FIX-33", "FIX-44", "FIX-55", "FIX-66", "FIX-77", "FIX-88"],
         "{}",
         run.json
     );
-    // The only other failure is the hypothesis pointing at a spec that is neither present nor indexed.
-    let files = run.json["dangling_spec_files"].as_array().expect("array");
-    assert_eq!(files.len(), 1, "{}", run.json);
-    assert_eq!(files[0]["spec"], "specs/999-nowhere.md");
-    assert_eq!(files[0]["file"], "hypotheses/p2.toml");
+    // Hypothesis `[poc].spec` is read as TOML: double or single quotes, inline tables; a path
+    // outside specs/ or with `..` is refused; a `spec` key in another table is not the POC spec.
+    let mut specs: Vec<String> = run.json["dangling_spec_files"]
+        .as_array()
+        .expect("array")
+        .iter()
+        .map(|d| d["spec"].as_str().expect("spec").to_owned())
+        .collect();
+    specs.sort();
+    assert_eq!(
+        specs,
+        vec![
+            "specs/../hypotheses/p1.toml",
+            "specs/998-single-quoted-nowhere.md",
+            "specs/999-nowhere.md"
+        ],
+        "{}",
+        run.json
+    );
 }
 
 /// Cites: CON-12

@@ -1,0 +1,28 @@
+name: pr-check
+# CON-14 / CON-7 / LOOP-20: label rules and CODEOWNERS coverage (ADR-6). A separate
+# workflow so that adding or removing a label re-runs this job only, not the gate matrix.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  pr-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - name: cargo xtask pr-check
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: cargo xtask pr-check --base "origin/${BASE_REF}" --labels "${LABELS}"

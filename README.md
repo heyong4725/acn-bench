@@ -33,7 +33,7 @@ Start with [`PLAN.md`](PLAN.md) for the design, [`specs/000-constitution.md`](sp
 ## Build and check
 
 ```bash
-rustup show          # installs the toolchain pinned in rust-toolchain.toml
+rustup toolchain install   # installs the toolchain pinned in rust-toolchain.toml
 tools/ci.sh          # fmt, clippy -D warnings, tests, trace-check, docs-inventory, env-hash, cargo-deny
 ```
 

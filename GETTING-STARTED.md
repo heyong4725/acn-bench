@@ -94,7 +94,7 @@ the server already holds. Measure bytes on the wire and turn completion time wit
 without a 2-second gap, against a plain HTTP/1.1 + SSE baseline in the same crate.
 ```
 
-It needs no substrate; it needs only Rust. `lab/` is excluded from the workspace, so `cargo new lab/turn-transport` gives a standalone crate (gates in `lab/README.md`). The lab note is the deliverable.
+It needs no substrate; it needs only Rust. Lab crates are standalone: `cp -R lab/_template lab/turn-transport` (do not `cargo new` inside the repo, it edits the root manifest; gates in `lab/README.md`). The lab note is the deliverable.
 
 ## 6. Day two onward
 

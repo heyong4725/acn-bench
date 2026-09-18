@@ -1,4 +1,12 @@
-# CON-7 / CON-10: the frozen set needs a human merge.
+# Enforcement points: changing these changes what the gates check.
+/.github/workflows/              @heyong4725
+/clippy.toml                     @heyong4725
+/deny.toml                       @heyong4725
+/rust-toolchain.toml             @heyong4725
+/tools/ci.sh                     @heyong4725
+
+# CON-7 / CON-10 / LOOP-20: protected paths need a human merge. Keep these exact
+# entries last: GitHub applies the last matching pattern (ADR-6).
 /hypotheses/                     @heyong4725
 /scenarios/measured/             @heyong4725
 /crates/acn-hyp/                 @heyong4725
@@ -7,3 +15,5 @@
 /specs/                          @heyong4725
 /env-hash.json                   @heyong4725
 /trace-scope.toml                @heyong4725
+/docs/gates/                     @heyong4725
+/.github/CODEOWNERS              @heyong4725

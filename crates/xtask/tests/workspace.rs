@@ -283,7 +283,7 @@ fn lab_is_outside_the_workspace_and_outside_the_determinism_lints() {
 
 /// Cites: CON-5
 #[test]
-fn clippy_bans_every_ambient_entropy_and_clock_source_and_unordered_maps() {
+fn clippy_bans_the_common_ambient_entropy_and_clock_sources_and_unordered_maps() {
     let cfg = toml_of("clippy.toml");
     let methods: Vec<&str> = cfg["disallowed-methods"]
         .as_array()
@@ -297,6 +297,10 @@ fn clippy_bans_every_ambient_entropy_and_clock_source_and_unordered_maps() {
         "rand::thread_rng",
         "fastrand::Rng::new",
         "getrandom::fill",
+        "getrandom::getrandom",
+        "fastrand::u64",
+        "std::time::SystemTime::elapsed",
+        "ahash::RandomState::new",
         "uuid::Uuid::new_v4",
         "chrono::Utc::now",
         "chrono::Local::now",
@@ -311,7 +315,13 @@ fn clippy_bans_every_ambient_entropy_and_clock_source_and_unordered_maps() {
         .iter()
         .map(|e| e["path"].as_str().expect("path"))
         .collect();
-    for t in ["std::collections::HashMap", "std::collections::HashSet"] {
+    for t in [
+        "std::collections::HashMap",
+        "std::collections::HashSet",
+        "hashbrown::HashMap",
+        "ahash::AHashMap",
+        "rand::rngs::OsRng",
+    ] {
         assert!(types.contains(&t), "clippy.toml must disallow {t}");
     }
     let ws = toml_of("Cargo.toml");
@@ -338,40 +348,186 @@ fn cargo_deny_bans_the_frameworks_transitively_and_unknown_sources() {
     assert_eq!(deny["sources"]["unknown-git"].as_str(), Some("deny"));
 }
 
+// ---- workflow checks: parsed structurally, comments stripped, so a commented-out
+// ---- line or a word inside a comment cannot satisfy them.
+
+/// A workflow file with `# comments` removed (quotes respected) and blank lines dropped.
+fn workflow(rel: &str) -> Vec<String> {
+    read(rel)
+        .lines()
+        .map(|l| {
+            let mut in_quote: Option<char> = None;
+            let mut out = String::new();
+            for c in l.chars() {
+                match (in_quote, c) {
+                    (None, '#') => break,
+                    (None, '"' | '\'') => in_quote = Some(c),
+                    (Some(q), _) if q == c => in_quote = None,
+                    _ => {}
+                }
+                out.push(c);
+            }
+            out.trim_end().to_owned()
+        })
+        .filter(|l| !l.trim().is_empty())
+        .collect()
+}
+
+/// The elements of the first inline list `key: [a, b, c]` in the workflow.
+fn inline_list(lines: &[String], key: &str) -> Vec<String> {
+    lines
+        .iter()
+        .find_map(|l| l.trim().strip_prefix(key))
+        .and_then(|rest| {
+            rest.trim()
+                .strip_prefix('[')?
+                .strip_suffix(']')
+                .map(str::to_owned)
+        })
+        .map(|inner| inner.split(',').map(|s| s.trim().to_owned()).collect())
+        .unwrap_or_default()
+}
+
+/// The top-level event names under `on:`.
+fn events(lines: &[String]) -> Vec<String> {
+    let start = lines.iter().position(|l| l == "on:").expect("`on:` block");
+    lines[start + 1..]
+        .iter()
+        .take_while(|l| l.starts_with(' '))
+        .filter(|l| l.starts_with("  ") && !l.starts_with("   "))
+        .map(|l| l.trim().trim_end_matches(':').to_owned())
+        .collect()
+}
+
 /// Cites: CON-1
 #[test]
-fn ci_builds_on_macos_arm64_and_linux_x86_64_and_aarch64() {
-    let ci = read(".github/workflows/ci.yml");
-    for runner in ["macos-latest", "ubuntu-latest", "ubuntu-24.04-arm"] {
-        assert!(ci.contains(runner), "CI matrix must include {runner}");
-    }
+fn ci_matrix_is_macos_arm64_linux_x86_64_and_linux_aarch64() {
+    let ci = workflow(".github/workflows/ci.yml");
+    assert_eq!(
+        inline_list(&ci, "os:"),
+        ["macos-latest", "ubuntu-latest", "ubuntu-24.04-arm"]
+    );
     assert!(
-        !ci.contains("rust-toolchain@stable"),
-        "CI must use the pinned toolchain from rust-toolchain.toml (CON-2), not floating stable"
+        ci.iter().any(|l| l.trim() == "runs-on: ${{ matrix.os }}"),
+        "the gates job must run on the matrix"
+    );
+    assert!(ci.iter().any(|l| l.trim() == "- run: tools/ci.sh"));
+    // CON-2: the pinned toolchain, not a floating channel.
+    assert!(
+        ci.iter()
+            .any(|l| l.trim() == "- run: rustup toolchain install")
+    );
+    assert!(
+        !ci.iter().any(|l| l.contains("rust-toolchain@")),
+        "no floating-toolchain action"
     );
 }
 
 /// Cites: CON-14, CON-7
 #[test]
-fn ci_runs_pr_check_with_the_labels_and_reruns_when_labels_change() {
-    let ci = read(".github/workflows/ci.yml");
-    assert!(ci.contains("cargo xtask pr-check"), "CI must run pr-check");
-    for ty in ["labeled", "unlabeled"] {
-        assert!(ci.contains(ty), "pull_request types must include `{ty}`");
+fn pr_check_workflow_passes_labels_and_base_and_reruns_on_label_changes() {
+    let wf = workflow(".github/workflows/pr-check.yml");
+    assert_eq!(events(&wf), ["pull_request"]);
+    let types = inline_list(&wf, "types:");
+    for t in ["opened", "synchronize", "reopened", "labeled", "unlabeled"] {
+        assert!(
+            types.iter().any(|x| x == t),
+            "pull_request types must include `{t}`: {types:?}"
+        );
     }
     assert!(
-        ci.contains("fetch-depth: 0"),
-        "pr-check diffs against the base branch and needs history"
+        wf.iter().any(
+            |l| l.trim() == "LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}"
+        ),
+        "labels must come from the event, through env (no script injection)"
+    );
+    assert!(
+        wf.iter()
+            .any(|l| l.trim() == "BASE_REF: ${{ github.base_ref }}")
+    );
+    assert!(
+        wf.iter().any(|l| l.trim()
+            == "run: cargo xtask pr-check --base \"origin/${BASE_REF}\" --labels \"${LABELS}\""),
+        "pr-check must receive the base and the labels"
+    );
+    assert!(
+        wf.iter().any(|l| l.trim() == "fetch-depth: 0"),
+        "the diff needs history"
     );
 }
 
 /// Cites: CON-12
 #[test]
-fn ci_has_a_nightly_trigger_for_the_nightly_tiers() {
-    let ci = read(".github/workflows/ci.yml");
+fn ci_has_a_live_nightly_trigger_and_a_job_that_uses_it() {
+    let ci = workflow(".github/workflows/ci.yml");
     assert!(
-        ci.contains("schedule:") && ci.contains("cron:"),
-        "nightly tiers need a schedule trigger"
+        events(&ci).iter().any(|e| e == "schedule"),
+        "{:?}",
+        events(&ci)
+    );
+    assert!(
+        ci.iter().any(|l| l.trim().starts_with("- cron: \"")),
+        "schedule needs a cron entry"
+    );
+    assert!(
+        ci.iter()
+            .any(|l| l.trim().starts_with("if: github.event_name == 'schedule'")),
+        "a job must run on the schedule"
+    );
+}
+
+/// Cites: CON-23
+#[test]
+fn ci_runs_the_lab_gates_on_every_lab_crate() {
+    let ci = workflow(".github/workflows/ci.yml");
+    assert!(
+        ci.iter()
+            .any(|l| l.trim() == "for manifest in lab/*/Cargo.toml; do")
+    );
+    assert!(
+        ci.iter()
+            .any(|l| l.trim() == "cargo fmt --manifest-path \"${manifest}\" --check")
+    );
+    assert!(
+        ci.iter().any(|l| l.trim()
+            == "cargo clippy --manifest-path \"${manifest}\" --all-targets -- -D warnings")
+    );
+}
+
+/// Cites: CON-23
+#[test]
+fn the_lab_template_is_its_own_workspace_root() {
+    let manifest = repo_root().join("lab/_template/Cargo.toml");
+    let out = std::process::Command::new(env!("CARGO"))
+        .args([
+            "metadata",
+            "--no-deps",
+            "--format-version",
+            "1",
+            "--manifest-path",
+        ])
+        .arg(&manifest)
+        .output()
+        .expect("cargo metadata");
+    assert!(
+        out.status.success(),
+        "a lab crate must resolve without the substrate workspace: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let meta: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json");
+    let ws_root = meta["workspace_root"].as_str().expect("workspace_root");
+    assert!(
+        ws_root.ends_with("lab/_template"),
+        "workspace_root must be the lab crate itself, got {ws_root}"
+    );
+    // The substrate manifest must not list any lab crate (what `cargo new` would do).
+    let ws = toml_of("Cargo.toml");
+    assert!(
+        ws["workspace"]["members"]
+            .as_array()
+            .expect("members")
+            .iter()
+            .all(|m| !m.as_str().expect("str").starts_with("lab"))
     );
 }
 

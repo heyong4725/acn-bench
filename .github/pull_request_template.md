@@ -12,9 +12,11 @@ IDs added to `trace-scope.toml`:
 
 ## Risk class (CON-10)
 
+A PR that touches more than one class is reviewed at the highest. One spec concern per PR (CON-11).
+
 - [ ] **A** — docs, tests, tools, xtask, scenarios/synthetic
 - [ ] **B** — run-path crate: affected acceptance suites run (`cargo test -p acn-accept --test <poc>`)
-- [ ] **C** — frozen set: label `env-change`, updated `env-hash.json`, adversarial review requested
+- [ ] **C** — frozen set: label `env-change`, updated `env-hash.json`, adversarial review requested, **human-merged** (CON-7)
 - [ ] touches `specs/`: label `spec-change`, rationale and IDs added / changed / retired stated above (CON-14)
 
 ## Interpretations (CON-15)
@@ -23,8 +25,8 @@ ADRs written:
 
 ## Gates
 
-- [ ] `tools/ci.sh` green locally
 - [ ] `docs/generated/` regenerated (`cargo xtask docs-inventory`)
+- [ ] `tools/ci.sh` green locally (documentation-only changes may run `fmt`, `docs-inventory --check` and `trace-check` only, CON-9)
 - [ ] For POC tasks: bundle `run_id` and `acn hyp verdict` output attached
 
 ## Review (CON-16)
