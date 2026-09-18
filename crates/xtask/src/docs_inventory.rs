@@ -27,6 +27,7 @@ pub struct Report {
     pub written: Vec<String>,
     pub changed: Vec<String>,
     pub stale: Vec<String>,
+    pub removed: Vec<String>,
 }
 
 fn md_escape(s: &str) -> String {
@@ -102,88 +103,81 @@ fn field<'a>(text: &'a str, key: &str) -> Option<&'a str> {
     Some(rest[..end].trim().trim_end_matches('.'))
 }
 
-fn decisions_md(root: &Path) -> Result<String> {
-    let dir = root.join("docs/decisions");
-    let mut rows = Vec::new();
+/// File names in `dir` accepted by `keep`, sorted; every listing error is reported.
+fn names_in(dir: &Path, keep: impl Fn(&str) -> bool) -> Result<Vec<String>> {
+    let mut names = Vec::new();
     if dir.is_dir() {
-        let mut names: Vec<String> = std::fs::read_dir(&dir)
-            .map_err(|e| Error::io(&dir, e))?
-            .filter_map(std::result::Result::ok)
-            .map(|e| e.file_name().to_string_lossy().into_owned())
-            .filter(|n| n.starts_with("ADR-") && n.ends_with(".md"))
-            .collect();
-        names.sort_by_key(|n| {
-            n.trim_start_matches("ADR-")
-                .trim_end_matches(".md")
-                .parse::<u32>()
-                .unwrap_or(u32::MAX)
-        });
-        for name in names {
-            let text = read(&dir.join(&name))?;
-            let title = text
-                .lines()
-                .find_map(|l| l.strip_prefix("# "))
-                .unwrap_or("")
-                .split_once('—')
-                .map_or_else(
-                    || name.trim_end_matches(".md").to_owned(),
-                    |(_, t)| t.trim().to_owned(),
-                );
-            let status = field(&text, "**Status:**").unwrap_or("—").to_owned();
-            let ids = field(&text, "**IDs affected:**").unwrap_or("—").to_owned();
-            rows.push(format!(
-                "| [{}](../decisions/{name}) | {} | {} | {} |",
-                name.trim_end_matches(".md"),
-                md_escape(&title),
-                md_escape(&status),
-                md_escape(&ids)
-            ));
+        for entry in std::fs::read_dir(dir).map_err(|e| Error::io(dir, e))? {
+            let entry = entry.map_err(|e| Error::io(dir, e))?;
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if keep(&name) {
+                names.push(name);
+            }
         }
     }
+    names.sort();
+    Ok(names)
+}
+
+fn h1_title(text: &str) -> &str {
+    text.lines()
+        .find_map(|l| l.strip_prefix("# "))
+        .unwrap_or("")
+        .trim()
+}
+
+fn decisions_md(root: &Path) -> Result<String> {
+    let dir = root.join("docs/decisions");
+    let mut names = names_in(&dir, |n| n.starts_with("ADR-") && n.ends_with(".md"))?;
+    // Numeric order with the file name as tie-breaker, so `ADR-3` and `ADR-03`, or
+    // two non-numeric names, never fall back to directory order, which differs by filesystem.
+    names.sort_by_key(|n| {
+        let number = n
+            .trim_start_matches("ADR-")
+            .trim_end_matches(".md")
+            .parse::<u32>()
+            .unwrap_or(u32::MAX);
+        (number, n.clone())
+    });
     let mut s = String::from(HEADER);
     s.push_str(
         "# Decision records\n\n| ADR | Title | Status | IDs affected |\n|---|---|---|---|\n",
     );
-    for r in rows {
-        s.push_str(&r);
-        s.push('\n');
+    for name in names {
+        let text = read(&dir.join(&name))?;
+        let stem = name.trim_end_matches(".md");
+        let title = h1_title(&text)
+            .split_once('—')
+            .map_or_else(|| stem.to_owned(), |(_, t)| t.trim().to_owned());
+        let status = field(&text, "**Status:**").unwrap_or("—");
+        let ids = field(&text, "**IDs affected:**").unwrap_or("—");
+        let _ = writeln!(
+            s,
+            "| [{stem}](../decisions/{name}) | {} | {} | {} |",
+            md_escape(&title),
+            md_escape(status),
+            md_escape(ids)
+        );
     }
     Ok(s)
 }
 
 fn lab_notes_md(root: &Path) -> Result<String> {
     let dir = root.join("docs/lab");
-    let mut rows = Vec::new();
-    if dir.is_dir() {
-        let mut names: Vec<String> = std::fs::read_dir(&dir)
-            .map_err(|e| Error::io(&dir, e))?
-            .filter_map(std::result::Result::ok)
-            .map(|e| e.file_name().to_string_lossy().into_owned())
-            .filter(|n| n.ends_with(".md"))
-            .collect();
-        names.sort();
-        for name in names {
-            let text = read(&dir.join(&name))?;
-            let title = text
-                .lines()
-                .find_map(|l| l.strip_prefix("# "))
-                .unwrap_or("")
-                .trim();
-            rows.push(format!(
-                "| [{}](../lab/{name}) | {} |",
-                name.trim_end_matches(".md"),
-                md_escape(title)
-            ));
-        }
-    }
+    let names = names_in(&dir, |n| n.ends_with(".md"))?;
     let mut s = String::from(HEADER);
     s.push_str("# Lab notes (CON-23)\n\n| Note | Title |\n|---|---|\n");
-    if rows.is_empty() {
+    if names.is_empty() {
         s.push_str("| — | no lab notes yet |\n");
     }
-    for r in rows {
-        s.push_str(&r);
-        s.push('\n');
+    for name in names {
+        let text = read(&dir.join(&name))?;
+        let _ = writeln!(
+            s,
+            "| [{}](../lab/{name}) | {} |",
+            name.trim_end_matches(".md"),
+            md_escape(h1_title(&text))
+        );
     }
     Ok(s)
 }
@@ -201,55 +195,77 @@ pub fn generate(root: &Path) -> Result<BTreeMap<String, String>> {
     Ok(files)
 }
 
+/// Entries of the generated directory that this task did not produce. Only a
+/// `.gitkeep` placeholder is tolerated: a hidden file is still stale content.
 fn stale_files(root: &Path, generated: &BTreeMap<String, String>) -> Result<Vec<String>> {
     let dir = root.join(GENERATED_DIR);
-    let mut stale = Vec::new();
-    if dir.is_dir() {
-        for entry in std::fs::read_dir(&dir).map_err(|e| Error::io(&dir, e))? {
-            let entry = entry.map_err(|e| Error::io(&dir, e))?;
-            let name = entry.file_name().to_string_lossy().into_owned();
-            if name.starts_with('.') {
-                continue;
-            }
-            let key = format!("{GENERATED_DIR}/{name}");
-            if !generated.contains_key(&key) {
-                stale.push(key);
-            }
-        }
-    }
-    stale.sort();
-    Ok(stale)
+    Ok(names_in(&dir, |n| n != ".gitkeep")?
+        .into_iter()
+        .map(|n| format!("{GENERATED_DIR}/{n}"))
+        .filter(|key| !generated.contains_key(key))
+        .collect())
 }
 
-/// Write (or, with `check`, compare) the generated files.
+/// An output path must be a regular file or absent. Following a symlink would
+/// let this task overwrite a file outside the directory it owns.
+fn refuse_symlink(path: &Path) -> Result<()> {
+    match std::fs::symlink_metadata(path) {
+        Ok(meta) if meta.file_type().is_symlink() => Err(Error::Invalid(format!(
+            "{} is a symlink; generated documentation is only written to regular files",
+            path.display()
+        ))),
+        _ => Ok(()),
+    }
+}
+
+/// Write (or, with `check`, compare) the generated files. Write mode owns the
+/// directory: it also removes stale files, so a write is always followed by a passing check.
 pub fn run(root: &Path, check: bool) -> Result<Report> {
     let generated = generate(root)?;
+    refuse_symlink(&root.join(GENERATED_DIR))?;
     let stale = stale_files(root, &generated)?;
     let mut written = Vec::new();
     let mut changed = Vec::new();
+    let mut removed = Vec::new();
     for (path, content) in &generated {
-        let on_disk = read(&root.join(path)).ok();
+        let target = root.join(path);
+        refuse_symlink(&target)?;
+        let on_disk = if target.exists() {
+            Some(read(&target)?)
+        } else {
+            None
+        };
         if on_disk.as_deref() != Some(content.as_str()) {
             changed.push(path.clone());
-            if !check {
-                write(&root.join(path), content)?;
+            if check {
+                tracing::warn!(file = %path, "generated documentation is out of date: run `cargo xtask docs-inventory`");
+            } else {
+                write(&target, content)?;
                 written.push(path.clone());
             }
         }
     }
-    for c in &changed {
-        tracing::warn!(file = %c, "generated documentation is out of date");
+    for path in &stale {
+        if check {
+            tracing::warn!(file = %path, "stale file in the generated directory: run `cargo xtask docs-inventory`");
+        } else {
+            let target = root.join(path);
+            let meta = std::fs::symlink_metadata(&target).map_err(|e| Error::io(&target, e))?;
+            if meta.is_dir() {
+                std::fs::remove_dir_all(&target).map_err(|e| Error::io(&target, e))?;
+            } else {
+                std::fs::remove_file(&target).map_err(|e| Error::io(&target, e))?;
+            }
+            removed.push(path.clone());
+        }
     }
-    let ok = if check {
-        changed.is_empty() && stale.is_empty()
-    } else {
-        true
-    };
+    let ok = !check || (changed.is_empty() && stale.is_empty());
     Ok(Report {
         ok,
         mode: if check { "check" } else { "write" },
         written,
         changed,
         stale,
+        removed,
     })
 }

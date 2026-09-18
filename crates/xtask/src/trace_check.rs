@@ -1,6 +1,7 @@
 //! `cargo xtask trace-check` (CON-12): every in-scope requirement has a citing
-//! test, every citation names a real ID and sits on a test function, and every
-//! ID reference in the docs and hypothesis files resolves (ADR-3).
+//! test, every citation names a real ID and sits on a test function in code the
+//! compiler sees, and every ID reference in the docs and hypothesis files resolves
+//! (ADR-3). Every failure is logged as well as reported.
 
 use std::path::Path;
 
@@ -78,6 +79,12 @@ pub fn run(root: &Path) -> Result<Report> {
     }
     for d in &refs.dangling_spec_files {
         tracing::error!(spec = %d.spec, at = %format!("{}:{}", d.file, d.line), "hypothesis names a spec that is neither present nor listed in specs/README.md");
+    }
+    for p in &model.problems {
+        tracing::error!(at = %format!("{}:{}", p.file, p.line), "{}", p.message);
+    }
+    for e in &model.scope_errors {
+        tracing::error!("{e}");
     }
     Ok(Report {
         ok,

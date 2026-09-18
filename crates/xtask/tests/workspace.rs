@@ -230,27 +230,114 @@ fn ci_script_chains_the_gates_in_order() {
     );
 }
 
+/// Whether a crate name belongs to a robotics or dataflow framework (CON-20).
+fn is_banned_crate(name: &str) -> bool {
+    let n = name.to_ascii_lowercase().replace('_', "-");
+    [
+        "dora",
+        "aisle",
+        "genesis",
+        "rclrs",
+        "r2r",
+        "rosrust",
+        "roslibrust",
+    ]
+    .contains(&n.as_str())
+        || [
+            "dora-",
+            "ros2-",
+            "ros2",
+            "rosrust-",
+            "rclrs-",
+            "r2r-",
+            "roslibrust-",
+            "ros-",
+        ]
+        .iter()
+        .any(|p| n.starts_with(p))
+}
+
+/// Every dependency table of a manifest: the three top-level ones and those
+/// under `[target.'cfg(..)'.*]`. Yields (key, real package name).
+fn dependency_names(m: &toml::Value) -> Vec<(String, String)> {
+    const TABLES: [&str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
+    let mut tables: Vec<&toml::value::Table> = TABLES
+        .iter()
+        .filter_map(|t| m.get(*t).and_then(toml::Value::as_table))
+        .collect();
+    if let Some(targets) = m.get("target").and_then(toml::Value::as_table) {
+        for target in targets.values() {
+            tables.extend(
+                TABLES
+                    .iter()
+                    .filter_map(|t| target.get(*t).and_then(toml::Value::as_table)),
+            );
+        }
+    }
+    tables
+        .into_iter()
+        .flat_map(|t| t.iter())
+        .map(|(key, spec)| {
+            // `alias = { package = "real-name" }` hides the real crate behind the key.
+            let package = spec
+                .get("package")
+                .and_then(toml::Value::as_str)
+                .unwrap_or(key);
+            (key.clone(), package.to_owned())
+        })
+        .collect()
+}
+
 /// Cites: CON-20
 #[test]
 fn no_substrate_crate_requires_a_robotics_or_dataflow_framework() {
-    let banned = ["dora", "ros", "rclrs", "r2r", "aisle", "genesis"];
-    for (_, manifest) in crate_manifests() {
+    let mut manifests: Vec<String> = crate_manifests().into_iter().map(|(_, m)| m).collect();
+    manifests.push("Cargo.toml".to_owned()); // [workspace.dependencies], inherited by `workspace = true`
+    for manifest in manifests {
         let m = toml_of(&manifest);
-        for table in ["dependencies", "dev-dependencies", "build-dependencies"] {
-            let Some(deps) = m.get(table).and_then(toml::Value::as_table) else {
-                continue;
-            };
-            for name in deps.keys() {
-                let lower = name.to_ascii_lowercase();
-                assert!(
-                    !banned.iter().any(|b| lower == *b
-                        || lower.starts_with(&format!("{b}-"))
-                        || lower.starts_with(&format!("{b}_"))),
-                    "{manifest}: `{name}` is a banned required dependency (CON-20)"
-                );
-            }
+        let mut names = dependency_names(&m);
+        if let Some(ws) = m.get("workspace") {
+            names.extend(dependency_names(ws));
+        }
+        for (key, package) in names {
+            assert!(
+                !is_banned_crate(&key) && !is_banned_crate(&package),
+                "{manifest}: `{key}` (package `{package}`) is a banned required dependency (CON-20)"
+            );
         }
     }
+}
+
+/// Cites: CON-20
+#[test]
+fn the_framework_matcher_catches_renames_and_targets_and_spares_lookalikes() {
+    for banned in [
+        "dora-node-api",
+        "dora_core",
+        "ros2-client",
+        "ros2_client",
+        "r2r",
+        "rclrs",
+        "rosrust_msg",
+        "aisle",
+    ] {
+        assert!(is_banned_crate(banned), "{banned} must be banned");
+    }
+    for fine in ["rosetta", "across", "doras", "r2r2", "serde", "tokio"] {
+        assert!(!is_banned_crate(fine), "{fine} must not be banned");
+    }
+    let m: toml::Value = toml::from_str(
+        "[dependencies]\nbus = { package = \"dora-node-api\", version = \"0.3\" }\n\n[target.'cfg(unix)'.dependencies]\nros2-client = \"0.7\"\n",
+    )
+    .expect("toml");
+    let names = dependency_names(&m);
+    assert!(
+        names
+            .iter()
+            .any(|(k, p)| k == "bus" && p == "dora-node-api"),
+        "{names:?}"
+    );
+    assert!(names.iter().any(|(k, _)| k == "ros2-client"), "{names:?}");
 }
 
 /// Cites: CON-23

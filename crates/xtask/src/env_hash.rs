@@ -1,12 +1,16 @@
 //! `cargo xtask env-hash` (CON-7): a blake3 over the frozen set, recorded in
 //! `env-hash.json` at the workspace root and checked as a gate (CON-9). See ADR-4.
+//!
+//! The walk fails closed: every entry under a frozen directory is either a
+//! regular file that gets hashed, a directory, or an error. Nothing is skipped
+//! by name except a zero-length `.gitkeep`.
 
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 
-use crate::workspace::{read, read_bytes, rel, write};
+use crate::workspace::{read, rel_strict, write};
 use crate::{Error, Result};
 
 /// The frozen set (CON-7), relative to the workspace root.
@@ -23,6 +27,7 @@ pub const RECORD_FILE: &str = "env-hash.json";
 
 /// One hashed file.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct FileHash {
     pub path: String,
     pub blake3: String,
@@ -59,49 +64,81 @@ pub struct Report {
     pub files: Vec<FileHash>,
 }
 
-fn is_placeholder(name: &str) -> bool {
-    name == ".gitkeep" || name == ".DS_Store"
+/// blake3 of a file, streamed so a large measured trace cannot exhaust memory.
+fn hash_file(path: &Path) -> Result<String> {
+    let file = std::fs::File::open(path).map_err(|e| Error::io(path, e))?;
+    let mut hasher = blake3::Hasher::new();
+    hasher.update_reader(file).map_err(|e| Error::io(path, e))?;
+    Ok(hasher.finalize().to_hex().to_string())
 }
 
-/// Compute the hash over the frozen set under `root`. Symlinks anywhere in
-/// the frozen set are refused: their targets would be hashed by name only.
-pub fn compute(root: &Path) -> Result<EnvHash> {
-    let mut files = Vec::new();
-    for base in FROZEN_SET {
-        let dir = root.join(base);
-        if !dir.exists() {
-            continue;
-        }
-        for entry in WalkDir::new(&dir).sort_by_file_name() {
-            let entry = entry?;
-            if entry.path_is_symlink() {
-                return Err(Error::Invalid(format!(
-                    "symlink inside the frozen set is not allowed: {}",
-                    rel(root, entry.path())
-                )));
-            }
-            if !entry.file_type().is_file()
-                || entry.file_name().to_str().is_some_and(is_placeholder)
-            {
-                continue;
-            }
-            let bytes = read_bytes(entry.path())?;
-            files.push(FileHash {
-                path: rel(root, entry.path()),
-                blake3: blake3::hash(&bytes).to_hex().to_string(),
-            });
-        }
-    }
-    files.sort_by(|a, b| a.path.cmp(&b.path));
+/// The environment hash of a file list: blake3 over `path \0 hex \n` records.
+fn hash_of(files: &[FileHash]) -> String {
     let mut hasher = blake3::Hasher::new();
-    for f in &files {
+    for f in files {
         hasher.update(f.path.as_bytes());
         hasher.update(b"\0");
         hasher.update(f.blake3.as_bytes());
         hasher.update(b"\n");
     }
+    hasher.finalize().to_hex().to_string()
+}
+
+/// Compute the hash over the frozen set under `root`.
+pub fn compute(root: &Path) -> Result<EnvHash> {
+    if !root.is_dir() {
+        return Err(Error::Invalid(format!(
+            "--root {} is not a directory",
+            root.display()
+        )));
+    }
+    let mut files = Vec::new();
+    for base in FROZEN_SET {
+        let dir = root.join(base);
+        // symlink_metadata: a dangling or redirecting symlink in place of a frozen
+        // directory must be refused, not skipped as "does not exist".
+        let meta = std::fs::symlink_metadata(&dir).map_err(|e| {
+            Error::Invalid(format!(
+                "frozen directory `{base}` is missing under {} ({e}); the frozen set is fixed by CON-7",
+                root.display()
+            ))
+        })?;
+        if !meta.is_dir() {
+            return Err(Error::Invalid(format!(
+                "frozen path `{base}` is not a real directory"
+            )));
+        }
+        for entry in WalkDir::new(&dir).sort_by_file_name() {
+            let entry = entry?;
+            let ty = entry.file_type();
+            let shown = entry.path().display();
+            if ty.is_dir() {
+                continue;
+            }
+            if !ty.is_file() {
+                return Err(Error::Invalid(format!(
+                    "only regular files are allowed in the frozen set; found a symlink or special file: {shown}"
+                )));
+            }
+            let name = entry.file_name().to_str().unwrap_or("");
+            let len = entry.metadata()?.len();
+            if name == ".gitkeep" && len == 0 {
+                continue;
+            }
+            if name == ".DS_Store" {
+                return Err(Error::Invalid(format!(
+                    "{shown}: remove Finder metadata from the frozen set (`find . -name .DS_Store -delete`)"
+                )));
+            }
+            files.push(FileHash {
+                path: rel_strict(root, entry.path())?,
+                blake3: hash_file(entry.path())?,
+            });
+        }
+    }
+    files.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(EnvHash {
-        env_hash: hasher.finalize().to_hex().to_string(),
+        env_hash: hash_of(&files),
         files,
     })
 }
@@ -148,7 +185,12 @@ pub enum Mode {
 /// Run in `mode`.
 pub fn run(root: &Path, mode: Mode) -> Result<Report> {
     let computed = compute(root)?;
-    let rec = recorded(root)?;
+    // Write mode must be able to repair a corrupt record, so it does not parse the old one.
+    let rec = if mode == Mode::Write {
+        None
+    } else {
+        recorded(root)?
+    };
     let recorded_hash = rec.as_ref().map(|r| r.env_hash.clone());
     let mut report = Report {
         ok: true,
@@ -167,21 +209,30 @@ pub fn run(root: &Path, mode: Mode) -> Result<Report> {
     match mode {
         Mode::Print => {}
         Mode::Check => {
-            let matches = recorded_hash.as_deref() == Some(computed.env_hash.as_str());
-            if !matches {
+            // The whole record must match, not only the top-level hash: the per-file
+            // list is what a reviewer reads to see which frozen file moved, and it
+            // must itself hash to the recorded value.
+            let hint = match &rec {
+                None => Some(format!(
+                    "{RECORD_FILE} is missing: run `cargo xtask env-hash --write`"
+                )),
+                Some(r) if hash_of(&r.files) != r.env_hash => Some(format!(
+                    "{RECORD_FILE} is inconsistent: its `env_hash` is not the hash of its own `files` list; regenerate it with `cargo xtask env-hash --write`"
+                )),
+                Some(r) if *r != computed => Some(format!(
+                    "frozen set differs from {RECORD_FILE}: if the change is intended, run `cargo xtask env-hash --write` and label the PR `env-change` (CON-7)"
+                )),
+                Some(_) => None,
+            };
+            if let Some(hint) = hint {
                 report.ok = false;
                 report.diff = rec.as_ref().map(|r| diff(&computed, r));
-                let hint = if rec.is_some() {
-                    "frozen set differs from env-hash.json: if the change is intended, run `cargo xtask env-hash --write` and label the PR `env-change` (CON-7)"
-                } else {
-                    "env-hash.json is missing: run `cargo xtask env-hash --write`"
-                };
                 tracing::error!(
                     computed = %computed.env_hash,
                     recorded = recorded_hash.as_deref().unwrap_or("<none>"),
                     "{hint}"
                 );
-                report.error = Some(hint.to_owned());
+                report.error = Some(hint);
             }
         }
         Mode::Write => {
