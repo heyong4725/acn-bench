@@ -27,7 +27,6 @@ pub enum Level {
 pub struct Requirement {
     pub id: String,
     pub prefix: String,
-    pub number: u32,
     /// Spec number, e.g. `"000"`.
     pub spec: String,
     /// Spec file name, e.g. `"000-constitution.md"`.
@@ -52,15 +51,6 @@ pub fn is_id(token: &str) -> bool {
             .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit());
     let number_ok = !number.is_empty() && number.chars().all(|c| c.is_ascii_digit());
     prefix_ok && number_ok
-}
-
-/// Split an ID into prefix and number; `None` if it is not an ID.
-pub fn split_id(token: &str) -> Option<(&str, u32)> {
-    if !is_id(token) {
-        return None;
-    }
-    let (prefix, number) = token.split_once('-')?;
-    Some((prefix, number.parse().ok()?))
 }
 
 /// The spec number of a file name like `010-trace-schema.md`.
@@ -91,35 +81,60 @@ fn section_token(heading: &str) -> Option<String> {
     (!token.is_empty() && token.chars().next().is_some_and(|c| c.is_ascii_digit())).then_some(token)
 }
 
-/// Parse one spec's text. Pure, for unit tests.
-pub fn parse_spec_text(file: &str, spec: &str, text: &str) -> Vec<Requirement> {
+/// A CommonMark fence opener or closer: its character and run length.
+fn fence(line: &str) -> Option<(char, usize)> {
+    let t = line.trim_start();
+    let c = t.chars().next().filter(|c| *c == '`' || *c == '~')?;
+    let n = t.chars().take_while(|x| *x == c).count();
+    (n >= 3).then_some((c, n))
+}
+
+/// The bold ID that starts a requirement paragraph, optionally behind a list marker.
+fn leading_id(line: &str) -> Option<&str> {
+    let t = line.trim_start();
+    let t = t
+        .strip_prefix("- ")
+        .or_else(|| t.strip_prefix("* "))
+        .unwrap_or(t)
+        .trim_start();
+    let rest = t.strip_prefix("**")?;
+    let token = &rest[..rest.find("**")?];
+    is_id(token).then_some(token)
+}
+
+/// Parse one spec's text. Pure, for unit tests. An unclosed code fence is an
+/// error: it would silently hide every requirement after it.
+pub fn parse_spec_text(file: &str, spec: &str, text: &str) -> Result<Vec<Requirement>> {
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     let lines: Vec<&str> = text.lines().collect();
     let mut out = Vec::new();
-    let mut in_fence = false;
+    // (fence character, opening run length, opening line)
+    let mut open: Option<(char, usize, usize)> = None;
     let mut section: Option<String> = None;
     for (i, line) in lines.iter().enumerate() {
+        if let Some((c, n)) = fence(line) {
+            match open {
+                None => open = Some((c, n, i + 1)),
+                // A fence closes only on the same character, at least as long, with nothing after it.
+                Some((oc, on, _)) if c == oc && n >= on && line.trim().chars().all(|x| x == c) => {
+                    open = None;
+                }
+                Some(_) => {}
+            }
+            continue;
+        }
+        if open.is_some() {
+            continue;
+        }
         let t = line.trim_start();
-        if t.starts_with("```") {
-            in_fence = !in_fence;
-            continue;
-        }
-        if in_fence {
-            continue;
-        }
         if let Some(h) = t.strip_prefix("## ") {
             section = section_token(h);
             continue;
         }
-        let Some(rest) = t.strip_prefix("**") else {
+        let Some(token) = leading_id(line) else {
             continue;
         };
-        let Some(end) = rest.find("**") else {
-            continue;
-        };
-        let token = &rest[..end];
-        let Some((prefix, number)) = split_id(token) else {
-            continue;
-        };
+        let prefix = token.split_once('-').map_or("", |(p, _)| p);
         let mut paragraph = (*line).to_owned();
         for l in &lines[i + 1..] {
             if l.trim().is_empty() {
@@ -131,7 +146,6 @@ pub fn parse_spec_text(file: &str, spec: &str, text: &str) -> Vec<Requirement> {
         out.push(Requirement {
             id: token.to_owned(),
             prefix: prefix.to_owned(),
-            number,
             spec: spec.to_owned(),
             file: file.to_owned(),
             section: section.clone(),
@@ -139,7 +153,12 @@ pub fn parse_spec_text(file: &str, spec: &str, text: &str) -> Vec<Requirement> {
             level: level_of(&paragraph),
         });
     }
-    out
+    if let Some((_, _, line)) = open {
+        return Err(Error::Invalid(format!(
+            "specs/{file}:{line}: code fence is never closed, which would hide every requirement after it"
+        )));
+    }
+    Ok(out)
 }
 
 /// Spec files under `<root>/specs/` that carry a numeric prefix, sorted.
@@ -177,7 +196,7 @@ pub fn parse_specs(root: &Path) -> Result<Vec<Requirement>> {
     let mut out = Vec::new();
     for (num, name) in spec_files(root)? {
         let text = read(&root.join("specs").join(&name))?;
-        let reqs = parse_spec_text(&name, &num, &text);
+        let reqs = parse_spec_text(&name, &num, &text)?;
         for r in reqs {
             if let Some(dup) = out.iter().find(|x: &&Requirement| x.id == r.id) {
                 return Err(Error::Invalid(format!(
@@ -195,56 +214,108 @@ pub fn parse_specs(root: &Path) -> Result<Vec<Requirement>> {
 mod tests {
     use super::*;
 
+    fn parse(text: &str) -> Vec<Requirement> {
+        parse_spec_text("900-x.md", "900", text).expect("parse")
+    }
+
+    fn specs_dir(files: &[(&str, &str)]) -> tempfile::TempDir {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir(dir.path().join("specs")).expect("mkdir");
+        for (name, body) in files {
+            std::fs::write(dir.path().join("specs").join(name), body).expect("write");
+        }
+        dir
+    }
+
+    /// Cites: CON-12
     #[test]
     fn id_shape() {
         assert!(is_id("CON-5"));
         assert!(is_id("P1A-12"));
+        assert!(
+            is_id("X-99999999999"),
+            "no numeric limit: the number is never parsed"
+        );
         assert!(!is_id("con-5"));
         assert!(!is_id("CON-"));
         assert!(!is_id("Status:"));
         assert!(!is_id("L0-Build"));
     }
 
+    /// Cites: CON-12
     #[test]
-    fn levels_and_sections() {
-        let text = "## 2. Rules\n\n**X-1** It MUST NOT fail.\n\n**X-2** It MAY\ncontinue and SHOULD end.\n\n```\n**X-3** fenced MUST\n```\n\n**X-4** plain text.\n";
-        let reqs = parse_spec_text("900-x.md", "900", text);
+    fn levels_sections_and_list_items() {
+        let reqs = parse(
+            "\u{feff}**X-0** First line after a BOM MUST parse.\n\n## 2. Rules\n\n**X-1** It MUST NOT fail.\n\n**X-2** It MAY\ncontinue and SHOULD end.\n\n- **X-3** A list item MUST count.\n\n**X-4** plain text.\n",
+        );
         let ids: Vec<&str> = reqs.iter().map(|r| r.id.as_str()).collect();
-        assert_eq!(ids, ["X-1", "X-2", "X-4"]);
-        assert_eq!(reqs[0].level, Level::Must);
-        assert_eq!(reqs[1].level, Level::Should);
-        assert_eq!(reqs[2].level, Level::None);
-        assert_eq!(reqs[0].section.as_deref(), Some("2"));
+        assert_eq!(ids, ["X-0", "X-1", "X-2", "X-3", "X-4"]);
+        assert_eq!(reqs[1].level, Level::Must);
+        assert_eq!(reqs[2].level, Level::Should);
+        assert_eq!(reqs[4].level, Level::None);
+        assert_eq!(reqs[1].section.as_deref(), Some("2"));
+        assert_eq!(reqs[1].prefix, "X");
     }
 
+    /// Cites: CON-12
+    #[test]
+    fn fences_hide_only_what_they_enclose() {
+        let text = "**X-1** before MUST.\n\n````md\n**X-2** fenced MUST\n```\nstill fenced: a shorter run does not close a longer fence\n**X-3** fenced MUST\n````\n\n**X-4** after MUST.\n\n~~~\n**X-5** tilde fenced MUST\n~~~\n\n**X-6** last MUST.\n";
+        let ids: Vec<String> = parse(text).into_iter().map(|r| r.id).collect();
+        assert_eq!(ids, ["X-1", "X-4", "X-6"]);
+    }
+
+    /// Cites: CON-12
+    #[test]
+    fn an_unclosed_fence_is_an_error_not_a_silent_truncation() {
+        let err = parse_spec_text(
+            "900-x.md",
+            "900",
+            "**X-1** a MUST.\n\n```\n**X-2** hidden MUST\n",
+        )
+        .expect_err("unclosed fence");
+        assert!(err.to_string().contains("900-x.md:3"), "{err}");
+    }
+
+    /// Cites: CON-12
     #[test]
     fn spec_numbers() {
         assert_eq!(spec_number("000-constitution.md"), Some("000"));
         assert_eq!(spec_number("README.md"), None);
     }
-}
 
-#[cfg(test)]
-mod duplicate_tests {
-    use super::*;
-
+    /// Cites: CON-12
     #[test]
-    fn duplicate_definitions_in_one_file_are_an_error() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        std::fs::create_dir(dir.path().join("specs")).expect("mkdir");
-        std::fs::write(
-            dir.path().join("specs/900-x.md"),
-            "**X-1** It MUST a.\n\n**X-1** It MUST b.\n",
-        )
-        .expect("write");
-        let err = parse_specs(dir.path()).expect_err("duplicate must fail");
+    fn duplicate_definitions_are_an_error_within_and_across_files() {
+        let one = specs_dir(&[("900-x.md", "**X-1** It MUST a.\n\n**X-1** It MUST b.\n")]);
+        let err = parse_specs(one.path()).expect_err("duplicate must fail");
         assert!(err.to_string().contains("defined twice"), "{err}");
+
+        let two = specs_dir(&[
+            ("900-a.md", "**X-1** It MUST a.\n"),
+            ("901-b.md", "**X-1** It MUST b.\n"),
+        ]);
+        let msg = parse_specs(two.path())
+            .expect_err("duplicate must fail")
+            .to_string();
+        assert!(
+            msg.contains("900-a.md") && msg.contains("901-b.md"),
+            "{msg}"
+        );
     }
 
+    /// Cites: CON-12
     #[test]
-    fn missing_specs_dir_is_an_error() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let err = parse_specs(dir.path()).expect_err("no specs/");
+    fn a_root_with_no_spec_files_is_an_error() {
+        let none = tempfile::tempdir().expect("tempdir");
+        let err = parse_specs(none.path()).expect_err("no specs/");
         assert!(err.to_string().contains("no specs/ directory"), "{err}");
+
+        let readme_only = specs_dir(&[("README.md", "# index\n")]);
+        let err = parse_specs(readme_only.path()).expect_err("no numbered specs");
+        assert!(
+            err.to_string().contains("no <NNN>-*.md spec files"),
+            "{err}"
+        );
     }
 }
