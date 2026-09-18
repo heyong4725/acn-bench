@@ -1,6 +1,6 @@
 # SPEC 000 — Constitution
 
-**Status:** Draft v0.2 (September 2026; v0.2 adds canonical run-ID, seed and build-hash encodings as CON-27, the RNG pin in CON-5, normative wording for CON-6/9/10, and the scope file in CON-12). **Inherits:** none. **Owner:** Young He.
+**Status:** Draft v0.2 (September 2026; v0.2 adds canonical run-ID, seed and build-hash encodings as CON-27, the RNG pin in CON-5, normative wording for CON-6/9/10, and the scope file in CON-12; CON-16 gains a solo-maintainer mode). **Inherits:** none. **Owner:** Young He.
 **Scope:** invariants that every other spec, crate, test and PR in acn-bench inherits. The key words MUST, MUST NOT, SHOULD, MAY are as in RFC 2119. Requirement IDs `CON-n` are stable once published; retired IDs are never reused.
 
 ## 0. Project definition
@@ -48,7 +48,7 @@ acn-bench is an independent Rust project that (a) builds the experimental substr
 
 **CON-15** When a spec is ambiguous, the implementer MUST record the interpretation in `docs/decisions/ADR-<n>.md` (context, decision, consequences, IDs affected) and proceed. Work MUST NOT stall on ambiguity.
 
-**CON-16** Implementation and review of a PR MUST be performed by different agents (or a human reviewer). Review findings are PR comments; the reviewer MUST NOT push to the branch.
+**CON-16** Review. The project is in *solo-maintainer mode* while every entry in `.github/CODEOWNERS` names the same single owner. In that mode independent review is not required: the maintainer MAY merge their own PRs once the gates (CON-9) are green, and a cross-review by a separate agent session (the prompt in `TASKS.md`) is RECOMMENDED, not required, for Class B and Class C changes. Once CODEOWNERS names a second owner, implementation and review of a PR MUST be performed by different people or agents, and a PR MUST NOT merge without that review. In either mode, review findings are PR comments and a reviewer MUST NOT push to the branch under review. The gates are never relaxed by this clause: solo-maintainer mode changes who may approve, not what must pass.
 
 ## 5. Experimental integrity
 

@@ -38,7 +38,7 @@ cargo fmt --all --check \
 - **Independence.** The substrate and every frozen result run without `dora-rs`, `aisle`, Genesis or ROS as required dependencies; optional adapters are fine as feature-gated or lab crates (CON-20). Ideas from elsewhere are welcome and get re-specified here when they graduate.
 - **Ambiguity.** Write `docs/decisions/ADR-<n>.md` (context, decision, consequences, IDs affected) and proceed; do not stall (CON-15).
 - **Commits.** Conventional commits `type(scope): subject` (`feat`, `fix`, `test`, `spec`, `docs`, `refactor`, `chore`, `ci`, `perf`). The repo squash-merges: the PR title becomes the mainline commit subject. Long bodies via `--body-file`, never inline heredocs. Branches `feat/…`, `fix/…`, `docs/…`, `spec/…`.
-- **Cross-review.** The agent that implements a PR does not review it. The reviewer runs the cross-review prompt in `TASKS.md`, comments findings, and does not push (CON-16). Class C PRs get an adversarial human pass whose job is to break the integrity story.
+- **Cross-review.** The project is in solo-maintainer mode (CON-16): independent review is recommended, not required, and the maintainer merges their own PRs once the gates are green. When you are asked to review, or for a risky Class B or C change, run the cross-review prompt in `TASKS.md` from a separate session, comment findings, and do not push. Once CODEOWNERS names a second owner, the agent that implements a PR does not review it, and review is mandatory. Class C PRs get an adversarial human pass whose job is to break the integrity story.
 
 ## Risk classes (CON-10)
 
@@ -76,4 +76,4 @@ cargo fmt --all --check \
 
 ## Definition of done for a substrate task
 
-All gates green; every MUST in scope cited by a test; ADRs written for every interpretation you made; PR lists the IDs; a reviewer other than you has commented. For POC tasks: a bundle in `runs/` regenerated from its run ID, and a verdict from `acn hyp verdict` attached to the PR.
+All gates green; every MUST in scope cited by a test; ADRs written for every interpretation you made; PR lists the IDs; and, once the project has a second maintainer, a reviewer other than you has commented (CON-16). For POC tasks: a bundle in `runs/` regenerated from its run ID, and a verdict from `acn hyp verdict` attached to the PR.

@@ -212,7 +212,7 @@ quantities, control, replicate count, falsifier predicate, expected outcome, and
 acceptance test names. Draft hypotheses/p<poc>.toml alongside it. Do not implement.
 ```
 
-**Cross-review (other agent):**
+**Cross-review (separate session; recommended in solo-maintainer mode, required once there is a second maintainer, CON-16):**
 ```
 Review PR <n> against specs/<NNN>. Check: every MUST in scope cited by a test;
 CON-5 determinism (no clock/rng leaks; sim replay bit-identical); CON-8 CLI contract;

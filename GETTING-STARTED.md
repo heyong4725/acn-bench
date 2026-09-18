@@ -41,7 +41,7 @@ cat > /tmp/protection.json <<'JSON'
   "required_status_checks": { "strict": true,
     "contexts": ["gates (macos-latest)", "gates (ubuntu-latest)", "pr-check"] },
   "enforce_admins": false,
-  "required_pull_request_reviews": { "required_approving_review_count": 1 },
+  "required_pull_request_reviews": { "required_approving_review_count": 0 },
   "restrictions": null
 }
 JSON
@@ -53,7 +53,7 @@ gh api -X PATCH repos/{owner}/acn-bench -F allow_squash_merge=true -F allow_merg
   -F delete_branch_on_merge=true
 ```
 
-With one maintainer, the one-approval rule means you merge your own PRs as admin (`gh pr merge <n> --squash --admin`) after the agent cross-review; add a second reviewer account when there is one.
+With one maintainer the project is in solo-maintainer mode (CON-16): no approving review is required, so set `required_approving_review_count` to 0 above and merge your own PRs with `gh pr merge <n> --squash` once the checks are green. Raise it to 1 when a second maintainer joins and is added to CODEOWNERS.
 
 ## 3. Secrets
 
@@ -81,7 +81,7 @@ Do not add acn-emu, tokio proxies or any network code yet. Finish with all gates
 green and a PR description listing requirement IDs.
 ```
 
-When it opens the PR, start a *second* `claude` session (or a different agent) for the cross-review prompt in `TASKS.md` (CON-16). Merge yourself after review.
+When it opens the PR, start a *second* `claude` session (or a different agent) for the cross-review prompt in `TASKS.md` if you want a second read (recommended, not required, in solo-maintainer mode, CON-16). Merge yourself once the checks are green.
 
 **Terminal B — lab, spike (a).** `git switch -c lab/turn-transport`, start `claude`, paste the lab-spike prompt from `TASKS.md` with:
 

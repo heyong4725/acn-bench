@@ -31,4 +31,7 @@ ADRs written:
 
 ## Review (CON-16)
 
-Reviewer is not the implementer. Findings as PR comments; the reviewer does not push.
+- [ ] Solo-maintainer mode: gates green; cross-review by a separate session is recommended for risky Class B/C changes (link it if done)
+- [ ] With a second maintainer: reviewed by someone other than the implementer
+
+Findings go in PR comments; a reviewer does not push.

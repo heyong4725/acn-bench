@@ -17,7 +17,7 @@ If you are not sure which track you are on, it is lab.
 4. Add the IDs you implemented to `trace-scope.toml`. Record every interpretation as `docs/decisions/ADR-<n>.md`.
 5. Regenerate `docs/generated/` with `cargo xtask docs-inventory`, then run `tools/ci.sh` (it checks that the generated docs are current).
 6. Open a PR with a conventional-commit title and the template filled in. One spec concern per PR.
-7. Someone other than the implementer reviews, using the cross-review prompt in `TASKS.md`.
+7. Review. While the project has one maintainer, independent review is recommended, not required (CON-16): the maintainer merges once the gates are green, and may ask a separate agent session for a cross-review using the prompt in `TASKS.md`. With a second maintainer, someone other than the implementer reviews every PR.
 
 ## Labels that are enforced
 

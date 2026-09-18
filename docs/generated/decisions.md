@@ -12,3 +12,4 @@
 | [ADR-6](../decisions/ADR-6.md) | `cargo xtask pr-check`: label rules and CODEOWNERS coverage as machine checks | accepted (xtask hardening) | CON-7, CON-14, LOOP-20 |
 | [ADR-7](../decisions/ADR-7.md) | `lab/` is outside the Cargo workspace and outside the determinism lints | accepted (foundation CI/lab) | CON-2, CON-6, CON-23 |
 | [ADR-8](../decisions/ADR-8.md) | Determinism lints: the common ambient clock and entropy sources, and unordered maps | accepted (foundation CI/lab) | CON-5, TRC-24 |
+| [ADR-9](../decisions/ADR-9.md) | Solo-maintainer mode for review (CON-16) | accepted (owner decision, 2026-09-18) | CON-16 |
