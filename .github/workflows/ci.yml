@@ -1,26 +1,72 @@
 name: ci
 on:
   pull_request:
+    # labeled/unlabeled: pr-check depends on the PR's labels (CON-7, CON-14).
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
     branches: [main]
+  schedule:
+    - cron: "17 7 * * *" # nightly tiers (CON-12)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   gates:
     strategy:
+      fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        # CON-1: macOS arm64, Linux x86_64, Linux aarch64.
+        os: [macos-latest, ubuntu-latest, ubuntu-24.04-arm]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with: { components: rustfmt, clippy }
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo install cargo-deny --locked
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # CON-2: the toolchain is the one pinned in rust-toolchain.toml, never floating stable.
+      - run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: taiki-e/install-action@4076c08d76dba979c11a7285295b0716c1d67908 # v2
+        with:
+          tool: cargo-deny
       - run: tools/ci.sh
-  netem:
-    # Linux-only ignored tier; runs nightly once T40 lands. Kept here so the job name is stable.
-    if: github.event_name == 'schedule'
+
+  pr-check:
+    # CON-14 / CON-7 / LOOP-20: label rules and CODEOWNERS coverage (ADR-6).
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - run: sudo -E cargo test --workspace --features netem -- --ignored
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - name: cargo xtask pr-check
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: cargo xtask pr-check --base "origin/${BASE_REF}" --labels "${LABELS}"
+
+  nightly:
+    # CON-12: the accept tier runs in full every night; live/netem join as they land.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - run: cargo test --workspace
+      - run: cargo test -p acn-accept
+
+  netem:
+    # Linux-only ignored tier. Enabled by the repository variable NETEM_ENABLED once
+    # T40 adds the `netem` feature; kept here so the job name is stable.
+    if: github.event_name == 'schedule' && vars.NETEM_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: rustup toolchain install || rustup show
+      - run: sudo -E env "PATH=$PATH" cargo test --workspace --features netem -- --ignored

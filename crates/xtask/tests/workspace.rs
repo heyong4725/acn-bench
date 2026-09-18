@@ -252,3 +252,125 @@ fn no_substrate_crate_requires_a_robotics_or_dataflow_framework() {
         }
     }
 }
+
+/// Cites: CON-23
+#[test]
+fn lab_is_outside_the_workspace_and_outside_the_determinism_lints() {
+    let ws = toml_of("Cargo.toml");
+    let exclude: Vec<&str> = ws["workspace"]["exclude"]
+        .as_array()
+        .expect("workspace.exclude")
+        .iter()
+        .map(|e| e.as_str().expect("str"))
+        .collect();
+    assert!(
+        exclude.contains(&"lab"),
+        "lab/ must be excluded or cargo rejects every lab crate"
+    );
+    // Clippy uses the nearest clippy.toml walking up from the crate, so lab/ needs
+    // its own or the CON-5 bans (Instant::now, …) would fail the lab gate.
+    let lab_cfg = toml_of("lab/clippy.toml");
+    assert!(
+        lab_cfg.get("disallowed-methods").is_none() && lab_cfg.get("disallowed-types").is_none(),
+        "lab/clippy.toml must not carry the substrate bans"
+    );
+    let gitignore = read(".gitignore");
+    assert!(
+        gitignore.lines().any(|l| l.trim() == "target/"),
+        "lab crates build into their own target/; ignore it at any depth"
+    );
+}
+
+/// Cites: CON-5
+#[test]
+fn clippy_bans_every_ambient_entropy_and_clock_source_and_unordered_maps() {
+    let cfg = toml_of("clippy.toml");
+    let methods: Vec<&str> = cfg["disallowed-methods"]
+        .as_array()
+        .expect("disallowed-methods")
+        .iter()
+        .map(|e| e["path"].as_str().expect("path"))
+        .collect();
+    for p in [
+        "rand::rng",
+        "rand::random",
+        "rand::thread_rng",
+        "fastrand::Rng::new",
+        "getrandom::fill",
+        "uuid::Uuid::new_v4",
+        "chrono::Utc::now",
+        "chrono::Local::now",
+        "time::OffsetDateTime::now_utc",
+        "std::collections::hash_map::RandomState::new",
+    ] {
+        assert!(methods.contains(&p), "clippy.toml must disallow {p}");
+    }
+    let types: Vec<&str> = cfg["disallowed-types"]
+        .as_array()
+        .expect("disallowed-types")
+        .iter()
+        .map(|e| e["path"].as_str().expect("path"))
+        .collect();
+    for t in ["std::collections::HashMap", "std::collections::HashSet"] {
+        assert!(types.contains(&t), "clippy.toml must disallow {t}");
+    }
+    let ws = toml_of("Cargo.toml");
+    assert_eq!(
+        ws["workspace"]["lints"]["clippy"]["disallowed_types"].as_str(),
+        Some("deny")
+    );
+}
+
+/// Cites: CON-20
+#[test]
+fn cargo_deny_bans_the_frameworks_transitively_and_unknown_sources() {
+    let deny = toml_of("deny.toml");
+    let banned: Vec<&str> = deny["bans"]["deny"]
+        .as_array()
+        .expect("bans.deny")
+        .iter()
+        .map(|e| e["crate"].as_str().expect("crate"))
+        .collect();
+    for c in ["dora-node-api", "dora-core", "rclrs", "r2r", "rosrust"] {
+        assert!(banned.contains(&c), "deny.toml must ban {c} (CON-20)");
+    }
+    assert_eq!(deny["sources"]["unknown-registry"].as_str(), Some("deny"));
+    assert_eq!(deny["sources"]["unknown-git"].as_str(), Some("deny"));
+}
+
+/// Cites: CON-1
+#[test]
+fn ci_builds_on_macos_arm64_and_linux_x86_64_and_aarch64() {
+    let ci = read(".github/workflows/ci.yml");
+    for runner in ["macos-latest", "ubuntu-latest", "ubuntu-24.04-arm"] {
+        assert!(ci.contains(runner), "CI matrix must include {runner}");
+    }
+    assert!(
+        !ci.contains("rust-toolchain@stable"),
+        "CI must use the pinned toolchain from rust-toolchain.toml (CON-2), not floating stable"
+    );
+}
+
+/// Cites: CON-14, CON-7
+#[test]
+fn ci_runs_pr_check_with_the_labels_and_reruns_when_labels_change() {
+    let ci = read(".github/workflows/ci.yml");
+    assert!(ci.contains("cargo xtask pr-check"), "CI must run pr-check");
+    for ty in ["labeled", "unlabeled"] {
+        assert!(ci.contains(ty), "pull_request types must include `{ty}`");
+    }
+    assert!(
+        ci.contains("fetch-depth: 0"),
+        "pr-check diffs against the base branch and needs history"
+    );
+}
+
+/// Cites: CON-12
+#[test]
+fn ci_has_a_nightly_trigger_for_the_nightly_tiers() {
+    let ci = read(".github/workflows/ci.yml");
+    assert!(
+        ci.contains("schedule:") && ci.contains("cron:"),
+        "nightly tiers need a schedule trigger"
+    );
+}

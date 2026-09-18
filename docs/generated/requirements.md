@@ -2,35 +2,35 @@
 
 # Requirement inventory
 
-Specs: 3 · IDs: 71 · MUSTs: 50 · implemented: 9 · cited: 11
+Specs: 3 · IDs: 71 · MUSTs: 50 · implemented: 9 · cited: 13
 
 | ID | Spec | § | Level | Implemented | Cited by |
 |---|---|---|---|---|---|
-| CON-1 | `000-constitution.md` | 1 | MUST | no | — |
+| CON-1 | `000-constitution.md` | 1 | MUST | no | `crates/xtask/tests/workspace.rs` `ci_builds_on_macos_arm64_and_linux_x86_64_and_aarch64` |
 | CON-2 | `000-constitution.md` | 1 | MUST | yes | `crates/xtask/tests/workspace.rs` `toolchain_is_pinned_stable_and_edition_2024` |
 | CON-3 | `000-constitution.md` | 1 | MUST | no | — |
 | CON-4 | `000-constitution.md` | 1 | MUST | no | — |
-| CON-5 | `000-constitution.md` | 2 | MUST | no | `crates/xtask/tests/workspace.rs` `clippy_disallows_ambient_time_and_randomness` |
+| CON-5 | `000-constitution.md` | 2 | MUST | no | `crates/xtask/tests/workspace.rs` `clippy_disallows_ambient_time_and_randomness`<br>`crates/xtask/tests/workspace.rs` `clippy_bans_every_ambient_entropy_and_clock_source_and_unordered_maps` |
 | CON-6 | `000-constitution.md` | 2 | MAY | yes | `crates/xtask/tests/workspace.rs` `layout_matches_the_constitution`<br>`crates/xtask/tests/workspace.rs` `workspace_members_are_exactly_the_layout` |
-| CON-7 | `000-constitution.md` | 2 | MUST | yes | `crates/xtask/tests/env_hash.rs` `hash_covers_exactly_the_frozen_set`<br>`crates/xtask/tests/env_hash.rs` `hash_is_deterministic_and_hex_blake3`<br>`crates/xtask/tests/env_hash.rs` `hash_changes_only_when_a_frozen_file_changes`<br>`crates/xtask/tests/env_hash.rs` `check_fails_without_a_record_and_passes_after_write`<br>`crates/xtask/tests/env_hash.rs` `self_host_the_recorded_hash_matches_the_workspace`<br>`crates/xtask/tests/env_hash.rs` `symlinks_inside_the_frozen_set_are_refused`<br>`crates/xtask/tests/env_hash.rs` `check_failure_reports_the_per_file_diff_and_a_hint`<br>`crates/xtask/tests/pr_check.rs` `a_frozen_set_edit_needs_env_change_once_m0_is_closed`<br>`crates/xtask/tests/pr_check.rs` `ordinary_changes_need_no_label` |
+| CON-7 | `000-constitution.md` | 2 | MUST | yes | `crates/xtask/tests/env_hash.rs` `hash_covers_exactly_the_frozen_set`<br>`crates/xtask/tests/env_hash.rs` `hash_is_deterministic_and_hex_blake3`<br>`crates/xtask/tests/env_hash.rs` `hash_changes_only_when_a_frozen_file_changes`<br>`crates/xtask/tests/env_hash.rs` `check_fails_without_a_record_and_passes_after_write`<br>`crates/xtask/tests/env_hash.rs` `self_host_the_recorded_hash_matches_the_workspace`<br>`crates/xtask/tests/env_hash.rs` `symlinks_inside_the_frozen_set_are_refused`<br>`crates/xtask/tests/env_hash.rs` `check_failure_reports_the_per_file_diff_and_a_hint`<br>`crates/xtask/tests/pr_check.rs` `a_frozen_set_edit_needs_env_change_once_m0_is_closed`<br>`crates/xtask/tests/pr_check.rs` `ordinary_changes_need_no_label`<br>`crates/xtask/tests/workspace.rs` `ci_runs_pr_check_with_the_labels_and_reruns_when_labels_change` |
 | CON-8 | `000-constitution.md` | 3 | MUST | yes | `crates/acn-cli/tests/cli_contract.rs` `version_prints_one_json_object_and_exits_zero`<br>`crates/acn-cli/tests/cli_contract.rs` `unknown_subcommand_is_a_json_error_with_exit_one`<br>`crates/xtask/tests/env_hash.rs` `env_hash_honours_the_json_contract_on_both_outcomes`<br>`crates/xtask/tests/pr_check.rs` `pr_check_base_mode_reads_the_diff_from_git`<br>`crates/xtask/tests/trace_check_selfhost.rs` `trace_check_emits_one_json_object_and_exit_code_tracks_ok`<br>`crates/xtask/tests/trace_check_selfhost.rs` `argument_errors_still_honour_the_json_contract` |
 | CON-9 | `000-constitution.md` | 3 | MAY | yes | `crates/xtask/tests/docs_inventory.rs` `check_fails_until_generated_docs_are_written_then_passes`<br>`crates/xtask/tests/docs_inventory.rs` `generation_is_deterministic`<br>`crates/xtask/tests/docs_inventory.rs` `self_host_generated_docs_are_current`<br>`crates/xtask/tests/workspace.rs` `ci_script_chains_the_gates_in_order` |
 | CON-10 | `000-constitution.md` | 3 | — | no | — |
 | CON-11 | `000-constitution.md` | 3 | MUST | no | — |
-| CON-12 | `000-constitution.md` | 4 | MUST | yes | `crates/xtask/tests/trace_check_selfhost.rs` `passes_when_every_implemented_must_is_cited`<br>`crates/xtask/tests/trace_check_selfhost.rs` `fails_on_an_uncited_must_in_an_implemented_section`<br>`crates/xtask/tests/trace_check_selfhost.rs` `fails_on_a_citation_of_a_nonexistent_id`<br>`crates/xtask/tests/trace_check_selfhost.rs` `fails_when_a_citation_is_not_attached_to_a_function`<br>`crates/xtask/tests/trace_check_selfhost.rs` `ids_inside_code_fences_are_not_requirements`<br>`crates/xtask/tests/trace_check_selfhost.rs` `self_host_the_real_workspace_passes`<br>`crates/xtask/tests/trace_check_selfhost.rs` `fails_when_a_citation_is_on_a_non_test_function`<br>`crates/xtask/tests/trace_check_selfhost.rs` `accepts_continuations_and_attribute_placements`<br>`crates/xtask/tests/trace_check_selfhost.rs` `a_root_without_specs_is_an_error_not_a_pass`<br>`crates/xtask/tests/trace_check_selfhost.rs` `an_in_scope_id_needs_a_citation_even_without_an_rfc_keyword`<br>`crates/xtask/tests/trace_check_selfhost.rs` `dangling_id_references_in_docs_and_hypotheses_fail`<br>`crates/xtask/tests/trace_check_selfhost.rs` `references_to_indexed_but_unwritten_specs_are_forward_not_dangling` |
+| CON-12 | `000-constitution.md` | 4 | MUST | yes | `crates/xtask/tests/trace_check_selfhost.rs` `passes_when_every_implemented_must_is_cited`<br>`crates/xtask/tests/trace_check_selfhost.rs` `fails_on_an_uncited_must_in_an_implemented_section`<br>`crates/xtask/tests/trace_check_selfhost.rs` `fails_on_a_citation_of_a_nonexistent_id`<br>`crates/xtask/tests/trace_check_selfhost.rs` `fails_when_a_citation_is_not_attached_to_a_function`<br>`crates/xtask/tests/trace_check_selfhost.rs` `ids_inside_code_fences_are_not_requirements`<br>`crates/xtask/tests/trace_check_selfhost.rs` `self_host_the_real_workspace_passes`<br>`crates/xtask/tests/trace_check_selfhost.rs` `fails_when_a_citation_is_on_a_non_test_function`<br>`crates/xtask/tests/trace_check_selfhost.rs` `accepts_continuations_and_attribute_placements`<br>`crates/xtask/tests/trace_check_selfhost.rs` `a_root_without_specs_is_an_error_not_a_pass`<br>`crates/xtask/tests/trace_check_selfhost.rs` `an_in_scope_id_needs_a_citation_even_without_an_rfc_keyword`<br>`crates/xtask/tests/trace_check_selfhost.rs` `dangling_id_references_in_docs_and_hypotheses_fail`<br>`crates/xtask/tests/trace_check_selfhost.rs` `references_to_indexed_but_unwritten_specs_are_forward_not_dangling`<br>`crates/xtask/tests/workspace.rs` `ci_has_a_nightly_trigger_for_the_nightly_tiers` |
 | CON-13 | `000-constitution.md` | 4 | MUST | no | — |
-| CON-14 | `000-constitution.md` | 4 | MUST | yes | `crates/xtask/tests/pr_check.rs` `a_spec_edit_without_the_spec_change_label_fails`<br>`crates/xtask/tests/pr_check.rs` `ordinary_changes_need_no_label` |
+| CON-14 | `000-constitution.md` | 4 | MUST | yes | `crates/xtask/tests/pr_check.rs` `a_spec_edit_without_the_spec_change_label_fails`<br>`crates/xtask/tests/pr_check.rs` `ordinary_changes_need_no_label`<br>`crates/xtask/tests/workspace.rs` `ci_runs_pr_check_with_the_labels_and_reruns_when_labels_change` |
 | CON-15 | `000-constitution.md` | 4 | MUST | no | — |
 | CON-16 | `000-constitution.md` | 4 | MUST | no | — |
 | CON-17 | `000-constitution.md` | 5 | MUST | no | — |
 | CON-18 | `000-constitution.md` | 5 | MUST | no | — |
 | CON-19 | `000-constitution.md` | 5 | MUST | yes | `crates/xtask/tests/workspace.rs` `every_crate_forbids_unsafe_and_inherits_the_lint_posture` |
-| CON-20 | `000-constitution.md` | 5 | MUST | yes | `crates/xtask/tests/workspace.rs` `no_substrate_crate_requires_a_robotics_or_dataflow_framework` |
+| CON-20 | `000-constitution.md` | 5 | MUST | yes | `crates/xtask/tests/workspace.rs` `no_substrate_crate_requires_a_robotics_or_dataflow_framework`<br>`crates/xtask/tests/workspace.rs` `cargo_deny_bans_the_frameworks_transitively_and_unknown_sources` |
 | CON-21 | `000-constitution.md` | 5 | MUST | no | — |
 | CON-22 | `000-constitution.md` | 6 | MAY | no | — |
 | CON-25 | `000-constitution.md` | 6 | MUST | no | — |
 | CON-26 | `000-constitution.md` | 6 | MUST | no | — |
-| CON-23 | `000-constitution.md` | 7 | MAY | no | — |
+| CON-23 | `000-constitution.md` | 7 | MAY | no | `crates/xtask/tests/workspace.rs` `lab_is_outside_the_workspace_and_outside_the_determinism_lints` |
 | CON-24 | `000-constitution.md` | 7 | — | no | — |
 | TRC-1 | `010-trace-schema.md` | 2 | MUST | no | — |
 | TRC-2 | `010-trace-schema.md` | 2 | MUST | no | — |

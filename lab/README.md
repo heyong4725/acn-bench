@@ -8,3 +8,14 @@ Gates: `cargo fmt` and `cargo clippy` on your crate, and a lab note in
 graduate / park / drop). No specs, no IDs, no controls, no frozen anything.
 
 Nothing here may be cited as a result. When you want to cite a number, graduate it (CON-24).
+
+## Starting a spike
+
+```bash
+cargo new lab/<slug>            # standalone crate: lab/ is excluded from the workspace
+cargo fmt   --manifest-path lab/<slug>/Cargo.toml --check
+cargo clippy --manifest-path lab/<slug>/Cargo.toml --all-targets -- -D warnings
+```
+
+Each lab crate has its own `Cargo.lock` and `target/`. `lab/clippy.toml` switches off the
+substrate's determinism bans, so `Instant::now()` and friends are fine here.
