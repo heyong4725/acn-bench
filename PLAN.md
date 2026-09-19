@@ -28,7 +28,7 @@ The catalogue (POC 1a–16) is the current map, not the boundary. Every mileston
 
 The emulator has a `sim` mode and a `live` mode behind the same `LinkModel` and `Clock` traits.
 
-- **`sim`** — a discrete-event simulator. No sockets. Time is a virtual clock advanced by the event queue; every random draw comes from an injected seeded RNG (ChaCha20). A run is bit-identical across machines of the same target and build (CON-27e). This is the ACN simulator; it is what unit and acceptance tests run, and what an auto-research loop searches over.
+- **`sim`** — a discrete-event simulator. No sockets. Time is a virtual clock advanced by the event queue; every random draw comes from an injected seeded RNG (ChaCha20). A run is bit-identical across machines of the same target and build (CON-31). This is the ACN simulator; it is what unit and acceptance tests run, and what an auto-research loop searches over.
 - **`live`** — the same link models applied by a userspace impairment proxy (tokio) between real sockets: the harness or generator on one side, an inference endpoint (mock or real) on the other. Wall clock, real TCP/HTTP behaviour, seeded impairment schedule. Statistically reproducible: the seed, scenario hash and environment hash are recorded in the bundle.
 - **`netem`** (Linux, feature-gated, M4) — the same scenario driven into `tc`/netem inside network namespaces, used to validate that `live` matches kernel-level impairment on the traces that matter.
 
@@ -104,7 +104,7 @@ Each gate is a spec (095) with an acceptance suite; a gate closes with a human-m
 - `Clock` trait with `SimClock` (virtual) and `WallClock`; no direct `Instant::now()` or `SystemTime::now()` outside `acn-emu::clock` (clippy `disallowed_methods` enforces it).
 - `Rng` injected as `rand_chacha::ChaCha20Rng` seeded from the run seed; sub-streams derived per component by name (`seed_for("emu.link0")`) so adding a component does not shift others.
 - Async: tokio with `start_paused = true` in `sim`; in `live`, all impairment schedules are precomputed from the seed before traffic starts, so the schedule is deterministic even if socket timing is not.
-- Every bundle carries a `run_id` derived from the seed, the scenario, workload, hypothesis and environment hashes, the mode and the run parameters, encoded exactly as CON-27(b) specifies; `acn bundle verify` recomputes it. The manifest also carries `build_hash` (CON-27e), which names the binary.
+- Every bundle carries a `run_id` derived from the seed, the scenario, workload, hypothesis and engine hashes, the mode and the run parameters, encoded exactly as CON-29 specifies; `acn bundle verify` recomputes it. The manifest also carries `build_hash` (CON-31), which names the binary, and its own hash is the `bundle_digest` (TRC-23), which names the data.
 - Floating-point reductions in `acn-attrib` use fixed summation order; no parallel reduction without a deterministic reducer.
 
 ## 7. Quality gates (CON-9)
