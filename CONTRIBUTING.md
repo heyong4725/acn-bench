@@ -26,7 +26,7 @@ If you are not sure which track you are on, it is lab.
 4. Add the IDs you implemented to `trace-scope.toml`. Record every interpretation as `docs/decisions/ADR-<n>.md`.
 5. Regenerate `docs/generated/` with `cargo xtask docs-inventory`, then run `tools/ci.sh` (it checks that the generated docs are current).
 6. Open a PR with a conventional-commit title and the template filled in. One spec concern per PR. `gh pr create --body-file` skips the template, so copy its headings into the body.
-7. Review. While the project has one maintainer, independent review is recommended, not required (CON-16): the maintainer merges once the gates are green, and may ask a separate agent session for a cross-review using the prompt in `TASKS.md`. With a second maintainer, someone other than the implementer reviews every PR. A cross-review is recorded as PR comments; it is not a GitHub approval.
+7. Review (CON-16). While CODEOWNERS names one owner, independent review is not a merge condition: the maintainer merges once the gates and the required CI checks are green. A review by a separate agent session should be requested for a Class C change (the adversarial prompt in `TASKS.md`) and for a Class B change the maintainer judges risky (the cross-review prompt). With a second maintainer, every PR needs an approving GitHub review from someone other than its author. An agent cross-review is PR comments in both modes and never counts as that approval. Agents do not merge on their own initiative.
 
 ## Labels
 

@@ -12,7 +12,7 @@ IDs added to `trace-scope.toml`:
 
 ## Risk class (CON-10)
 
-A PR that touches more than one class is reviewed at the highest. One spec concern per PR (CON-11).
+A PR that touches more than one class is handled at the highest. One spec concern per PR (CON-11).
 
 - [ ] **A** — docs, tests, tools, xtask, scenarios/synthetic
 - [ ] **B** — run-path crate: affected acceptance suites run (`cargo test -p acn-accept --test <poc>`)
@@ -32,7 +32,10 @@ ADRs written:
 
 ## Review (CON-16)
 
-- [ ] Solo-maintainer mode: gates green; cross-review by a separate session is recommended for risky Class B/C changes (link it if done)
-- [ ] With a second maintainer: reviewed by someone other than the implementer
+Tick exactly one. The mode is read from `.github/CODEOWNERS` on the base branch.
 
-Findings go in PR comments; a reviewer does not push.
+- [ ] Solo-maintainer mode, merged without independent review (for a Class C or a risky Class B change, say why above)
+- [ ] Solo-maintainer mode, reviewed by a separate session (adversarial prompt for Class C, cross-review otherwise): link
+- [ ] CODEOWNERS names a second owner: approved by someone other than the author
+
+Findings go in PR comments; a reviewer does not push. After the M0 gate a Class C change needs the adversarial review of CON-7 in either mode.

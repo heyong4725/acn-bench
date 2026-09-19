@@ -2,7 +2,7 @@
 
 # Requirement inventory
 
-Specs: 4 · IDs: 104 · MUSTs: 99 · implemented: 8 · cited: 16
+Specs: 4 · IDs: 104 · MUSTs: 99 · implemented: 8 · cited: 17
 
 | ID | Spec | § | Level | Implemented | Cited by |
 |---|---|---|---|---|---|
@@ -26,7 +26,7 @@ Specs: 4 · IDs: 104 · MUSTs: 99 · implemented: 8 · cited: 16
 | CON-13 | `000-constitution.md` | 4 | MUST | no | `crates/xtask/tests/workspace.rs` `a_spec_conflict_issue_template_exists_with_the_mandated_title` |
 | CON-14 | `000-constitution.md` | 4 | MUST | no | `crates/xtask/src/pr_check.rs` `path_normalisation`<br>`crates/xtask/tests/pr_check.rs` `a_spec_edit_without_the_spec_change_label_fails`<br>`crates/xtask/tests/pr_check.rs` `ordinary_changes_need_no_label`<br>`crates/xtask/tests/pr_check.rs` `moving_a_file_out_of_a_protected_directory_is_still_a_change_to_it`<br>`crates/xtask/tests/pr_check.rs` `non_ascii_paths_are_not_hidden_by_git_quoting`<br>`crates/xtask/tests/pr_check.rs` `changed_paths_are_normalised_before_matching`<br>`crates/xtask/tests/pr_check.rs` `a_tag_that_shadows_the_base_branch_is_refused`<br>`crates/xtask/tests/pr_check.rs` `paths_that_alias_a_protected_directory_are_classified_with_it`<br>`crates/xtask/tests/pr_check.rs` `labels_as_json_cannot_be_split_on_commas`<br>`crates/xtask/tests/workspace.rs` `pr_check_reads_live_labels_and_reruns_on_label_and_base_changes` |
 | CON-15 | `000-constitution.md` | 4 | MUST | no | — |
-| CON-16 | `000-constitution.md` | 4 | MUST | no | — |
+| CON-16 | `000-constitution.md` | 4 | MUST | no | `crates/xtask/tests/workspace.rs` `the_pr_template_asks_for_requirement_ids_class_and_labels` |
 | CON-17 | `000-constitution.md` | 5 | MUST | no | — |
 | CON-18 | `000-constitution.md` | 5 | MUST | no | — |
 | CON-19 | `000-constitution.md` | 5 | MUST | yes | `crates/xtask/tests/workspace.rs` `every_crate_forbids_unsafe_and_inherits_the_lint_posture`<br>`crates/xtask/tests/workspace.rs` `the_workspace_lint_table_is_exactly_the_agreed_posture`<br>`crates/xtask/tests/workspace.rs` `every_path_package_in_the_lockfile_is_a_workspace_member` |

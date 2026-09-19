@@ -212,12 +212,14 @@ quantities, control, replicate count, falsifier predicate, expected outcome, and
 acceptance test names. Draft hypotheses/p<poc>.toml alongside it. Do not implement.
 ```
 
-**Cross-review (separate session; recommended in solo-maintainer mode, required once there is a second maintainer, CON-16):**
+**Cross-review (separate session; CON-16 says when it should be requested; it informs, and never replaces, the approving review that a second maintainer makes mandatory):**
 ```
 Review PR <n> against specs/<NNN>. Check: every MUST in scope cited by a test;
 CON-5 determinism (no clock/rng leaks; sim replay bit-identical); CON-8 CLI contract;
-CON-18 control present in any acceptance suite; no edits to specs/, hypotheses/ or the
-frozen set; error messages actionable. Comment findings; do not push.
+CON-18 control present in any acceptance suite; edits to specs/ only in a spec-change PR
+with rationale and IDs (CON-14); edits to hypotheses/ or the frozen set only in a Class C
+PR, which also gets the adversarial prompt below (CON-7, CON-17, HYP-26); error messages
+actionable. Comment findings; do not push.
 ```
 
 **Adversarial review (Class C):**

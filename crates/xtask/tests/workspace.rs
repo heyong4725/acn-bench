@@ -1142,7 +1142,7 @@ fn headings(text: &str) -> Vec<&str> {
     text.lines().filter(|l| l.starts_with('#')).collect()
 }
 
-/// Cites: CON-10, CON-11
+/// Cites: CON-10, CON-11, CON-16
 #[test]
 fn the_pr_template_asks_for_requirement_ids_class_and_labels() {
     let t = read(".github/pull_request_template.md");
@@ -1188,6 +1188,17 @@ fn the_pr_template_asks_for_requirement_ids_class_and_labels() {
     }
     assert!(boxes.iter().any(|l| l.contains("`tools/ci.sh` green")));
     assert!(boxes.iter().any(|l| l.contains("enforcement point")));
+    // CON-16: exactly one of three review outcomes is recorded, so that "merged
+    // without review" is a statement someone made and not an empty section.
+    let review: Vec<&&str> = boxes
+        .iter()
+        .filter(|l| l.contains("Solo-maintainer mode") || l.contains("second owner"))
+        .collect();
+    assert_eq!(review.len(), 3, "three review outcomes: {review:?}");
+    assert!(review[0].contains("merged without independent review"));
+    assert!(review[1].contains("reviewed by a separate session"));
+    assert!(review[2].contains("approved by someone other than the author"));
+    assert!(t.contains("Tick exactly one."));
 }
 
 /// Cites: CON-13
