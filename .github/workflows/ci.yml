@@ -23,7 +23,7 @@ jobs:
         os: [macos-latest, ubuntu-latest, ubuntu-24.04-arm]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false # build scripts and tests never see the token
       # CON-2: the toolchain is the one pinned in rust-toolchain.toml, never floating stable.
@@ -41,7 +41,7 @@ jobs:
     # CON-23: the only gates for lab crates are fmt and clippy on the crate itself.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false # build scripts and tests never see the token
       - run: rustup toolchain install
@@ -61,7 +61,7 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false # build scripts and tests never see the token
       - run: rustup toolchain install
@@ -74,7 +74,7 @@ jobs:
     if: github.event_name == 'schedule' && vars.NETEM_ENABLED == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false # build scripts and tests never see the token
       - run: rustup toolchain install
