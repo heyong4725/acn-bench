@@ -59,7 +59,7 @@ gh api -X PUT repos/{owner}/acn-bench/private-vulnerability-reporting
 
 Also in the UI: Settings → Actions → General → require actions to be pinned to a full-length commit SHA. The required checks are the ones ADR-6 names; `pr-check`, `lab` and the arm64 gate exist only once the CI workflows are on `main`, so add them then.
 
-The approval count is 0 because GitHub does not let an author approve their own PR: with one maintainer the CON-16 cross-review is recorded as PR comments, not as a GitHub approval. Merge with `gh pr merge <n> --squash` once the checks are green. Never make `--admin` a habit: it skips every required check, not only the approval, which is why `enforce_admins` is on. If a check is broken for reasons outside the PR, switch `enforce_admins` off for that one merge and back on. Raise the count to 1 and require code-owner review when a second maintainer joins.
+With one maintainer the project is in solo-maintainer mode (CON-16): no approving review is required, and GitHub does not let an author approve their own PR anyway, so `required_approving_review_count` is 0 above. Merge your own PRs with `gh pr merge <n> --squash` once the checks are green. Never make `--admin` a habit: it skips every required check, not only the approval, which is why `enforce_admins` is on. If a check is broken for reasons outside the PR, switch `enforce_admins` off for that one merge and back on. When a second maintainer joins, add them to CODEOWNERS and, in the same step, raise the count to 1 and require code-owner review: nothing switches these settings for you.
 
 ## 3. Secrets
 
@@ -87,7 +87,7 @@ Do not add acn-emu, tokio proxies or any network code yet. Finish with all gates
 green and a PR description listing requirement IDs.
 ```
 
-When it opens the PR, start a *second* `claude` session (or a different agent) for the cross-review prompt in `TASKS.md` (CON-16). Merge yourself after review.
+When it opens the PR, start a *second* `claude` session (or a different agent) for the matching review prompt in `TASKS.md` when CON-16 says one should be requested (a Class C change, or a Class B change you judge risky). Merge yourself once the checks are green; an agent merges only when you tell it to for that PR.
 
 **Terminal B — lab, spike (a).** `git switch -c lab/turn-transport`, start `claude`, paste the lab-spike prompt from `TASKS.md` with:
 
@@ -104,7 +104,7 @@ It needs no substrate; it needs only Rust. Lab crates are standalone: `cp -R lab
 
 ## 6. Day two onward
 
-Substrate: T02 (SPEC 010 is already drafted — the agent implements it), then T03, T04, T05, T05b (the loop runner, SPEC 085 — also drafted), T06 in order, one PR each, cross-reviewed. Specs 030/040/080/095/100 are *not* drafted yet: each of those tasks starts with the spec-drafting prompt from `TASKS.md` as a `spec-change` PR you merge, then the implementation PR. Lab: spike (b) `lab/trace-capture` needs a phone tethered on 5G and any server you can reach (a $5 VPS is enough); do the walk once, land the trace via T08. Spike (c) `lab/hypotheses/p17-a2a.toml` is already written; iterate on it when the generator exists.
+Substrate: T02 (SPEC 010 is already drafted — the agent implements it), then T03, T04, T05, T05b (the loop runner, SPEC 085 — also drafted), T06 in order, one PR each (review as CON-16 says). Specs 030/040/080/095/100 are *not* drafted yet: each of those tasks starts with the spec-drafting prompt from `TASKS.md` as a `spec-change` PR you merge, then the implementation PR. Lab: spike (b) `lab/trace-capture` needs a phone tethered on 5G and any server you can reach (a $5 VPS is enough); do the walk once, land the trace via T08. Spike (c) `lab/hypotheses/p17-a2a.toml` is already written; iterate on it when the generator exists.
 
 ## 6a. Empty directories (historical: T01 added the crates and the `.gitkeep` files)
 
