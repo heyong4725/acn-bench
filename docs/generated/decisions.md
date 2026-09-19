@@ -12,3 +12,4 @@
 | [ADR-6](../decisions/ADR-6.md) | `cargo xtask pr-check`: label rules and CODEOWNERS coverage as machine checks | accepted (xtask hardening) | CON-7, CON-14, LOOP-20 |
 | [ADR-7](../decisions/ADR-7.md) | `lab/` is outside the Cargo workspace and outside the determinism lints | accepted (foundation CI/lab) | CON-2, CON-6, CON-23 |
 | [ADR-8](../decisions/ADR-8.md) | Determinism lints: the common ambient clock and entropy sources, and unordered maps | accepted (foundation CI/lab) | CON-5, TRC-24 |
+| [ADR-10](../decisions/ADR-10.md) | Pre-landing review of the integrity specs: what a run is bound to, and what a verdict may conclude | accepted (spec-change, foundation integrity) | CON-5, CON-7, CON-8, CON-25, CON-26, CON-27 to CON-31, TRC-11 to TRC-14, TRC-19, TRC-21 to TRC-23, TRC-27, TRC-33, TRC-35, TRC-36, TRC-38, HYP-2, HYP-3, HYP-6, HYP-9 to HYP-16, HYP-20 to HYP-24, HYP-26 to HYP-28 |
